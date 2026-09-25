@@ -17,7 +17,6 @@ flowchart LR
     U[Navegador: interfaz y escena 3D] --> S[Workers Static Assets]
     U -->|HTTPS /api/*| W[Worker: API Hono]
     W -->|binding DB| D[(D1 del entorno)]
-    W -->|API de correo| E[Proveedor de email transaccional]
     G[CI: código de confianza] -->|migraciones y despliegue| W
     G -->|build del cliente| S
 ```
@@ -27,7 +26,6 @@ flowchart LR
 | Workers Static Assets | HTML, JavaScript, CSS, marca y catálogo 3D | Publicar junto al Worker |
 | Worker con Hono | Sesiones, autorización, hogares, tareas e intercambios | Un Worker por entorno, organizado en módulos |
 | D1 | Datos de negocio y autenticación | Una base por entorno, binding `DB` |
-| Email transaccional | Entregar enlaces de acceso | Proveedor por elegir, invocado desde el Worker |
 | Dominio y HTTPS | Punto público de acceso | Subdominio inicial de Workers; dominio propio al lanzamiento si está disponible |
 | R2 | Archivos grandes o contenido incorporado posteriormente | Opcional, fuera del despliegue inicial |
 
@@ -39,7 +37,7 @@ El navegador renderiza la casa, los avatares y las animaciones. Cargar la escena
 
 ## Datos y consistencia
 
-D1 guardará usuarios, sesiones, enlaces de acceso, hogares, integrantes, invitaciones, tareas, versiones de sus reglas de rotación, ocurrencias, intercambios e historial. Usar migraciones SQL versionadas, claves foráneas e índices por hogar, estado y fecha. La API derivará el hogar desde la sesión y verificará la pertenencia de cada recurso; D1 no aporta automáticamente el aislamiento por hogar que necesita el producto.
+D1 guardará usuarios, sesiones, hashes de claves personales, hogares, integrantes, invitaciones, tareas, versiones de sus reglas de rotación, ocurrencias, intercambios e historial. Usar migraciones SQL versionadas, claves foráneas e índices por hogar, estado y fecha. La API derivará el hogar desde la sesión y verificará la pertenencia de cada recurso; D1 no aporta automáticamente el aislamiento por hogar que necesita el producto.
 
 Reglas de implementación:
 
@@ -55,15 +53,15 @@ D1 dispone de `batch()` transaccional: si una sentencia falla, se revierte el lo
 
 La generación concurrente y las acciones repetidas deben producir un único efecto. No habilitar réplicas de lectura inicialmente; si se incorporan, revisar explícitamente consistencia y lectura posterior a escritura.
 
-## Autenticación y correo
+## Autenticación por códigos
 
-El Worker gestionará el acceso por enlace de un solo uso y las sesiones. Evaluar una biblioteca mantenida compatible con Workers y D1 antes de implementar estos mecanismos; la elección queda pendiente de una prueba de compatibilidad.
+El Worker gestiona perfiles, claves personales y sesiones. La implementación inicial está en `backend/auth.ts` y `backend/security.ts`. No requiere correo electrónico.
 
-Los tokens de acceso serán aleatorios, de corta duración y se almacenarán como hash. Consumirlos atómicamente y permitir únicamente destinos de retorno conocidos. Usar cookies de sesión `HttpOnly`, `Secure` y `SameSite`, expiración y revocación al cerrar sesión. Proteger mutaciones frente a CSRF y aplicar límites de envío e intentos sin revelar si un correo está registrado.
+Al crear un perfil, se genera una clave personal aleatoria de 100 bits y se muestra una sola vez. D1 conserva únicamente su hash. Las sesiones vencen a los 30 días y usan cookies `HttpOnly`, `SameSite=Lax` y `Secure` sobre HTTPS. Cerrar sesión revoca la sesión actual. Las mutaciones validan origen y formato JSON; los intentos de acceso tienen límites.
 
-El proveedor de email deberá admitir llamadas HTTPS desde Workers, remitente verificado y autenticación del dominio de correo. Configurar por entorno las URL de acceso y su lista permitida. Los enlaces de invitación requerirán sesión, caducidad, revocación y validación del destinatario cuando la invitación esté asociada a un correo, según la especificación funcional.
+Los códigos de casa son independientes de las claves personales. Caducan a los siete días; generar otro revoca el anterior. La unión exige una sesión válida, cupo disponible y que el usuario no pertenezca a otra casa. No registrar claves, códigos ni cookies en logs.
 
-En desarrollo, capturar los correos en un buzón de pruebas local. En staging, usar destinatarios de prueba. No registrar enlaces de acceso, cookies, tokens ni cuerpos de correo en los logs de producción.
+La recuperación de una cuenta sin clave ni sesión activa está fuera de esta primera implementación.
 
 ## Entornos y configuración
 
@@ -89,24 +87,24 @@ Propuesta: GitHub Actions como único mecanismo de CI/CD, evitando dos sistemas 
 4. Aplicar migraciones compatibles hacia adelante antes del Worker nuevo. Probar primero en staging; serializar despliegues y detener la publicación si una migración falla.
 5. Ejecutar las pruebas de humo con dos usuarios: acceso, invitación, aislamiento entre hogares, rotación, completar, deshacer e intercambio simultáneo.
 6. Promover el mismo commit y artefacto probado a producción mediante un job de release; aplicar sus migraciones y publicar Worker y assets.
-7. Comprobar carga de la web, navegación directa, acceso por correo y API. Registrar versión publicada y procedimiento de rollback.
+7. Comprobar carga de la web, navegación directa, acceso por clave personal y API. Registrar versión publicada y procedimiento de rollback.
 
-La primera publicación puede usar la URL asignada por Workers. Para dominio propio, configurar la zona, el dominio del Worker y las URL permitidas del correo, y verificar HTTPS antes de distribuir enlaces. No hay un dominio elegido en esta propuesta.
+La primera publicación puede usar la URL asignada por Workers. Para dominio propio, configurar la zona, el dominio del Worker, y verificar HTTPS antes de distribuir enlaces. No hay un dominio elegido en esta propuesta.
 
 Separar permisos de CI por entorno cuando sea posible. Para despliegue y migraciones se necesitan permisos de Workers y D1; añadir rutas/DNS solo al gestionar dominio, y R2 solo si se incorpora. No utilizar permisos de facturación o administración general para un pipeline de publicación. [Autorización de Workers](https://developers.cloudflare.com/workers/authorization/).
 
 ## Operación y recuperación
 
 - Logs estructurados con identificador de solicitud, operación, duración y resultado; excluir datos personales, cabeceras de autenticación y contenido de tareas.
-- Seguir errores 5xx, latencia de API, fallos de correo, recuperación de ocurrencias y consumo de Workers/D1. Separar rechazos esperados de negocio de fallos internos.
-- Definir alertas y límites de gasto/consumo disponibles antes de abrir el servicio. El costo depende de peticiones, CPU, lecturas/escrituras SQL, almacenamiento y emails; no se asume costo cero ni se fija una tarifa sin revisar el plan vigente.
+- Seguir errores 5xx, latencia de API, recuperación de ocurrencias y consumo de Workers/D1. Separar rechazos esperados de negocio de fallos internos.
+- Definir alertas y límites de gasto/consumo disponibles antes de abrir el servicio. El costo depende de peticiones, CPU, lecturas/escrituras SQL, almacenamiento; no se asume costo cero ni se fija una tarifa sin revisar el plan vigente.
 - Verificar la retención de D1 Time Travel del plan elegido y ensayar una restauración en un entorno de prueba. Actualmente la documentación de límites indica siete días en Free y treinta en Paid. [Límites de D1](https://developers.cloudflare.com/d1/platform/limits/), [recuperación](https://developers.cloudflare.com/d1/reference/time-travel/).
 - Antes de una migración relevante, identificar un punto recuperable y realizar un export privado si corresponde. Los exports nunca se guardan en Git ni en assets públicos.
 - Ante fallo de código, volver a la versión previa del Worker, siempre compatible con el esquema actual. Revertir código no revierte datos: restaurar D1 requiere valorar pérdida de escrituras posteriores, detener cambios y coordinar la recuperación.
 
 ## Decisiones pendientes y condición de salida
 
-Antes de producción deben resolverse proveedor de correo, biblioteca de autenticación, dominio, plan y presupuesto, retención operativa y responsables de recuperación. Verificar los permisos efectivos y la habilitación de los servicios al provisionar, sin publicar detalles de cuentas o tokens en esta documentación.
+Antes de producción deben resolverse estrategia de recuperación de cuentas, dominio, plan y presupuesto, retención operativa y responsables de recuperación. Verificar los permisos efectivos y la habilitación de los servicios al provisionar, sin publicar detalles de cuentas o tokens en esta documentación.
 
 R2 queda diferido porque el MVP no permite subir archivos y el catálogo puede acompañar al build. Si el tamaño de los modelos supera los límites del hosting estático o requiere publicación independiente, incorporarlo con binding y una política explícita de acceso. Tampoco se requieren inicialmente KV, Queues, Durable Objects ni un cron.
 

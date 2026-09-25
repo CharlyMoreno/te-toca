@@ -30,8 +30,8 @@ Entrar → Crear casa → Invitar integrantes → Crear tareas
 Una persona invitada sigue este flujo:
 
 ```text
-Abrir invitación → Entrar o registrarse → Aceptar invitación
-                → Entrar a una habitación y ver sus tareas
+Recibir código de casa → Crear perfil o entrar con clave personal
+                    → Ingresar código → Entrar a una habitación y ver sus tareas
 ```
 
 ## Componentes funcionales
@@ -40,14 +40,14 @@ Abrir invitación → Entrar o registrarse → Aceptar invitación
 
 **Qué hace:** identifica a cada persona para mantener sus acciones y mostrarle solo la casa a la que pertenece.
 
-- Entrada con enlace enviado al correo electrónico.
-- Si es su primera vez, se le pide un nombre visible.
-- La sesión se conserva al volver a abrir la aplicación.
-- Si no tiene casa, puede crear una o aceptar una invitación válida.
+- La primera vez, la persona elige un nombre visible y recibe una clave personal aleatoria. Debe guardarla: se muestra una sola vez.
+- Quien vuelve desde otro dispositivo entra con esa clave personal, sin correo ni contraseña.
+- La sesión se conserva durante 30 días al volver a abrir la aplicación.
+- Si no tiene casa, puede crear una o elegir «Me invitaron» e ingresar un código de casa válido.
 - Si tiene casa, entra directamente a la vista principal.
 - Puede cerrar sesión.
 
-**Estados:** correo enviado, enlace inválido o vencido, error al entrar.
+**Estados:** clave personal inválida, demasiados intentos, error al entrar. La recuperación de una clave perdida queda fuera de esta primera versión.
 
 ### 2. Casa e integrantes
 
@@ -55,17 +55,17 @@ Abrir invitación → Entrar o registrarse → Aceptar invitación
 
 - La persona creadora indica nombre de la casa y zona horaria.
 - Se crea como administradora y ve una casa vacía con la acción «Agregar primera tarea».
-- Puede invitar a alguien indicando su correo. La invitación queda «pendiente» hasta que esa persona la acepta.
-- Al aceptarla, el invitado pasa a ser integrante activo y aparece en la casa.
+- Puede generar un código de ocho caracteres, compartirlo por el medio que prefiera y regenerarlo para invalidar el anterior. El código vence a los siete días.
+- Al ingresar un código válido, el invitado pasa a ser integrante activo y aparece en la casa.
 - Cada integrante activo tiene un avatar 3D sencillo con nombre y color identificador. El color se elige al crear su perfil y puede cambiarse después.
-- La administradora puede copiar o revocar una invitación pendiente.
-- Se muestran integrantes activos e invitaciones pendientes por separado.
+- La administradora puede copiar el código recién generado o revocarlo al generar uno nuevo.
+- Se muestran los integrantes activos. No se crean participantes pendientes hasta que ingresan con el código.
 - Solo los integrantes activos pueden formar parte de una rotación y asumir tareas.
 - Una cuenta no puede aceptar una invitación de otra casa mientras pertenezca a una.
 
 Para simplificar el primer lanzamiento, el administrador configura tareas e invitaciones; cualquier integrante puede ver tareas, completar las propias y gestionar intercambios.
 
-**Estados:** invitación vencida o revocada, cupo de seis integrantes alcanzado, correo ya invitado, usuario ya integrante.
+**Estados:** código inválido, vencido o revocado; cupo de seis integrantes alcanzado; usuario ya integrante de una casa.
 
 ### 3. Casa 3D y recorrido
 
@@ -167,9 +167,9 @@ Dentro de cada habitación se puede alternar entre **Mis tareas** y **Todas**. L
 
 | Pantalla | Elementos principales |
 | --- | --- |
-| Acceso | Correo, envío de enlace, nombre visible cuando corresponda |
+| Acceso | Crear perfil con nombre, mostrar clave personal una vez, volver a entrar con la clave |
 | Crear casa | Nombre de la casa, zona horaria, confirmación |
-| Integrantes | Lista de activos, invitaciones pendientes, formulario para invitar |
+| Integrantes | Lista de activos y código de casa generado por quien administra |
 | Inicio | Casa 3D, avatar propio, avatares y progreso de integrantes, pendientes por habitación y acceso a cada una |
 | Habitación | Objetos de tareas, responsables con su avatar, tarjetas con acciones, hechas hoy y próximas tareas |
 | Detalle de tarea | Responsable, fecha, estado, completar, proponer intercambio |
@@ -193,7 +193,8 @@ En móvil y escritorio, se entra primero a la casa. Al elegir una habitación se
 - La base de datos del MVP es **Cloudflare D1**. Guarda hogares, integrantes, invitaciones, tareas, ocurrencias, solicitudes de intercambio e historial.
 - Una API en **Cloudflare Workers con Hono y TypeScript** recibe las acciones del navegador y accede a D1 mediante un binding. El cliente nunca consulta ni modifica D1 directamente.
 - El Worker verifica la sesión, la pertenencia al hogar y los permisos antes de devolver o cambiar datos. D1 no reemplaza esta lógica de autorización.
-- La entrada por enlace de correo requiere gestionar usuarios, enlaces de un solo uso y sesiones desde la API, además de elegir un servicio que entregue los correos.
+- El acceso usa una clave personal de alta entropía que se muestra una sola vez. La base solo conserva su hash; la sesión se guarda en una cookie HttpOnly. El Worker limita intentos de entrada y de unión por código.
+- El código de casa tiene vencimiento y puede regenerarse. La unión comprueba el código, la capacidad máxima y que el usuario no pertenezca ya a otra casa.
 - Completar una tarea o aceptar un intercambio debe guardar los cambios relacionados de forma atómica y comprobar que la ocurrencia sigue pendiente. Así se evitan duplicados y cambios parciales entre dispositivos.
 - El esquema se gestionará con migraciones SQL. Cada ocurrencia tendrá una clave única formada por tarea y fecha.
 
@@ -205,6 +206,7 @@ En móvil y escritorio, se entra primero a la casa. Al elegir una habitación se
 - Tareas mensuales, tareas únicas y horarios límite configurables.
 - Sugerencias automáticas según esfuerzo o disponibilidad.
 - Varios hogares por cuenta, cambio de administrador y eliminación de integrantes.
+- Recuperación de cuentas sin clave personal ni sesión activa.
 - Tareas compartidas que requieren varias personas al mismo tiempo.
 - Fotos como prueba, puntos, premios y castigos.
 

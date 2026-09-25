@@ -7,8 +7,9 @@ Te Toca es un juego de navegador para parejas y compañeros de vivienda que orga
 El jugador recorre una pequeña casa 3D con su avatar. En cada habitación encuentra objetos que representan tareas reales. Al confirmar que hizo una, el avatar interactúa con el objeto y el ambiente se ordena. Los avatares de los demás integrantes muestran sus tareas hechas, pendientes y atrasadas.
 
 La definición de pantallas, flujos y reglas de uso está en [la especificación funcional del MVP](docs/MVP_FUNCIONAL.md).
+El [modelo de datos](docs/DB_MODEL.md) separa el esquema de acceso ya creado de las tablas previstas para las tareas.
 
-Estado: definición del MVP; la aplicación todavía no está implementada. Te Toca es el nombre propuesto. Su disponibilidad comercial y de dominio no fue verificada.
+Estado: primer módulo implementado (acceso, creación de casa y unión por código). El recorrido 3D, las tareas y los intercambios siguen definidos para el MVP. Te Toca es el nombre propuesto; su disponibilidad comercial y de dominio no fue verificada.
 
 ## Problema
 
@@ -41,7 +42,7 @@ Un hogar puede registrar sus integrantes, configurar tareas recurrentes y recorr
 ## Flujo principal
 
 1. Una persona inicia sesión, crea un hogar y elige su zona horaria.
-2. Comparte un enlace de invitación con los demás integrantes, que se identifican para unirse.
+2. Comparte un código de invitación con los demás integrantes, que crean su perfil y se unen a la casa.
 3. Crea tareas indicando habitación, frecuencia, primera fecha y participantes de la rotación.
 4. La aplicación asigna el primer turno y muestra en cada habitación cuántas tareas hay pendientes. Los avatares resumen lo hecho y lo pendiente de cada persona.
 5. El integrante elige una habitación; su avatar camina hacia ella y la cámara lo sigue. Allí ve los objetos que representan las tareas de hoy y las atrasadas, junto con el responsable de cada una.
@@ -69,7 +70,7 @@ Un hogar puede registrar sus integrantes, configurar tareas recurrentes y recorr
 ### Configuración del hogar
 
 - Nombre del hogar, zona horaria e integrantes.
-- Invitación mediante enlace revocable.
+- Invitación mediante código revocable que vence a los siete días.
 - Creación y edición de tareas; opción de pausarlas.
 - Selección y orden de los participantes de cada rotación.
 
@@ -84,11 +85,11 @@ Un hogar puede registrar sus integrantes, configurar tareas recurrentes y recorr
 ### Hogar e integrantes
 
 - Un hogar activo por usuario en el MVP.
-- Inicio de sesión por enlace enviado al correo.
+- Acceso mediante una clave personal generada al crear el perfil, sin correo electrónico. La sesión se conserva durante 30 días.
 - Hasta seis integrantes, con nombre visible, color identificador y un avatar 3D simple.
 - La persona creadora administra el hogar, las invitaciones y las tareas.
 - Los demás integrantes consultan el hogar, completan sus tareas y gestionan sus intercambios.
-- Una invitación requiere autenticación y deja de permitir ingresos si se revoca o se alcanza el límite de integrantes.
+- Una invitación requiere un perfil con sesión iniciada y deja de permitir ingresos si se revoca, vence o se alcanza el límite de integrantes.
 - El hogar puede configurarse con una sola persona, pero la rotación compartida requiere al menos dos.
 - Quitar integrantes y transferir la administración quedan fuera de esta primera versión.
 
@@ -173,7 +174,8 @@ Todas las acciones también están disponibles mediante teclado y en la lista ge
 | --- | --- |
 | Hogar | Identificador, nombre, zona horaria y administrador |
 | Integrante | Usuario autenticado, hogar, nombre, color y variante de avatar |
-| Invitación | Hogar, token y estado de revocación |
+| Acceso | Clave personal con hash guardado y sesiones con vencimiento |
+| Invitación | Hogar, hash del código, vencimiento y estado de revocación |
 | Tarea | Título, habitación, icono, frecuencia, fecha inicial, participantes ordenados y estado |
 | Ocurrencia | Tarea, fecha, índice de rotación, responsable original, responsable actual, estado y finalización |
 | Intercambio | Dos ocurrencias, solicitante, destinatario, estado y fechas |
@@ -189,7 +191,7 @@ La combinación de tarea y fecha identifica de forma única cada ocurrencia. Las
 - **Hono + TypeScript en Cloudflare Workers** como API pública: sesiones, hogares, invitaciones, tareas, rotaciones, intercambios y permisos.
 - **Cloudflare D1** como base de datos SQL del hogar, integrantes, tareas, ocurrencias, intercambios e historial.
 - El mismo Worker accede a D1 mediante un binding, sin otra API entre ambos.
-- Acceso por enlace enviado al correo, con usuarios y sesiones gestionados por el Worker. La entrega de correos requiere un proveedor que se elegirá al implementar.
+- Acceso por clave personal y unión por código de casa; el Worker gestiona usuarios, sesiones y límites de intentos. No se requiere proveedor de correo.
 - Operaciones atómicas de datos para generar ocurrencias y aceptar intercambios, con condiciones que impidan aplicar acciones duplicadas o vencidas.
 - Actualización de datos al abrir o volver a la aplicación y después de cada acción; la sincronización instantánea queda fuera del MVP.
 
@@ -201,11 +203,23 @@ Este stack es una propuesta de implementación, no una lista de dependencias ya 
 
 ## Despliegue en Cloudflare
 
-La propuesta es publicar el cliente con Workers Static Assets y la API Hono en el mismo Worker, con Cloudflare D1 para persistencia y entornos separados de pruebas y producción. El envío de enlaces de acceso requiere un proveedor de correo por elegir. R2 queda como componente opcional.
+La propuesta es publicar el cliente con Workers Static Assets y la API Hono en el mismo Worker, con Cloudflare D1 para persistencia y entornos separados de pruebas y producción. El acceso usa claves personales y códigos de casa, sin proveedor de correo. R2 queda como componente opcional.
 
 El análisis, las decisiones de arquitectura, el plan de publicación y la recuperación están documentados en [la propuesta de infraestructura](docs/INFRAESTRUCTURA.md). La infraestructura todavía no está provisionada.
 
 Las credenciales se configuran localmente en `.env.local`, excluido de Git, o mediante secretos del entorno de despliegue. `.env.example` documenta únicamente los nombres de las variables, sin valores. Nunca incluir secretos en el frontend ni usar el prefijo `VITE_` para ellos.
+
+## Estado del código y desarrollo local
+
+El código está organizado en [`frontend/`](frontend/) y [`backend/`](backend/). La primera migración de D1 define `users`, `access_keys`, `sessions`, `auth_rate_limits`, `homes`, `home_members` y `home_invites`. La lógica de tareas todavía no tiene tablas ni endpoints: se implementará en los siguientes módulos.
+
+```bash
+npm install
+npm run db:migrate:local
+npm run dev
+```
+
+El entorno local usa una base D1 simulada. Para desplegar, se debe crear la base D1 real, reemplazar el `database_id` de ejemplo en `wrangler.jsonc`, aplicar las migraciones remotas y publicar el Worker. Ninguna clave personal ni código de casa se guarda en texto legible: solo se almacenan sus hashes. La clave personal se muestra una vez al crear el perfil; si se pierde y la sesión vence, esta primera versión no puede recuperar la cuenta.
 
 ## Fuera del MVP
 
