@@ -2,9 +2,9 @@
 
 **Una casa compartida, turnos claros.**
 
-Te Toca es una aplicación web para parejas y compañeros de vivienda que organiza las tareas recurrentes del hogar. Muestra qué hay que hacer, a quién le toca y qué se completó, con turnos automáticos y la posibilidad de intercambiarlos de común acuerdo.
+Te Toca es un juego de navegador para parejas y compañeros de vivienda que organiza las tareas recurrentes del hogar. Muestra qué hay que hacer, a quién le toca y qué se completó, con turnos automáticos y la posibilidad de intercambiarlos de común acuerdo.
 
-Una pequeña casa 3D representa los ambientes y a sus integrantes mediante avatares. Cada avatar muestra qué tareas hizo y cuáles tiene pendientes. Las tareas aparecen como objetos dentro de cada habitación y desaparecen con una animación al completarlas.
+El jugador recorre una pequeña casa 3D con su avatar. En cada habitación encuentra objetos que representan tareas reales. Al confirmar que hizo una, el avatar interactúa con el objeto y el ambiente se ordena. Los avatares de los demás integrantes muestran sus tareas hechas, pendientes y atrasadas.
 
 La definición de pantallas, flujos y reglas de uso está en [la especificación funcional del MVP](docs/MVP_FUNCIONAL.md).
 
@@ -36,7 +36,7 @@ La hipótesis es que una lista compartida con responsables claros reduce las con
 
 ## Objetivo del MVP
 
-Un hogar puede registrar sus integrantes, configurar tareas recurrentes, ver sus avatares y entrar a cada habitación de una casa 3D para ver qué hay que hacer allí, completar pendientes y acordar intercambios. Una lista general permite consultar todo el hogar y sirve como alternativa accesible.
+Un hogar puede registrar sus integrantes, configurar tareas recurrentes y recorrer una casa 3D para verlas y resolverlas en su habitación. El juego refleja el progreso de las tareas hechas en el mundo real mediante avatares, objetos y cambios en la casa. Una lista general permite consultar todo el hogar y sirve como alternativa accesible.
 
 ## Flujo principal
 
@@ -44,8 +44,8 @@ Un hogar puede registrar sus integrantes, configurar tareas recurrentes, ver sus
 2. Comparte un enlace de invitación con los demás integrantes, que se identifican para unirse.
 3. Crea tareas indicando habitación, frecuencia, primera fecha y participantes de la rotación.
 4. La aplicación asigna el primer turno y muestra en cada habitación cuántas tareas hay pendientes. Los avatares resumen lo hecho y lo pendiente de cada persona.
-5. Cada integrante entra a una habitación y ve allí los objetos que representan las tareas de hoy y las atrasadas, junto con el responsable de cada una.
-6. Al completar una tarea propia desde esa habitación, su objeto desaparece con una animación y la acción queda registrada.
+5. El integrante elige una habitación; su avatar camina hacia ella y la cámara lo sigue. Allí ve los objetos que representan las tareas de hoy y las atrasadas, junto con el responsable de cada una.
+6. Tras hacer una tarea en la vida real, confirma «Ya la hice». El avatar realiza una animación breve, el objeto se ordena o desaparece y la acción queda registrada.
 7. La siguiente ocurrencia corresponde al próximo integrante de la rotación.
 8. Si necesita cambiar un turno, el integrante propone un intercambio con una tarea de otra persona; el cambio se aplica cuando esta lo acepta.
 
@@ -54,6 +54,7 @@ Un hogar puede registrar sus integrantes, configurar tareas recurrentes, ver sus
 ### Inicio: nuestra casa
 
 - Casa 3D con cuatro ambientes fijos: cocina, baño, dormitorio y zona común.
+- Avatar del jugador que se desplaza hacia la habitación elegida y realiza animaciones breves al completar sus tareas.
 - Avatares 3D de los integrantes activos en la vista general, con nombre y estado: hechas hoy, pendientes hoy y atrasadas.
 - Al tocar un avatar, se ven sus tareas y se resaltan las habitaciones donde tiene pendientes.
 - Indicadores de tareas pendientes por ambiente, separados en propias y del hogar.
@@ -147,9 +148,9 @@ Reglas:
 
 Ejemplo: Ana tiene que limpiar el baño el sábado y Bruno debe sacar la basura el viernes. Ana propone intercambiar esas dos tareas. Cuando Bruno acepta, cambian los responsables de esas ocurrencias; la semana siguiente continúa la rotación original.
 
-## Experiencia 3D
+## Experiencia de juego 3D
 
-La casa será una escena pequeña de estilo ilustrado, con vista isométrica y geometrías simples. No se necesita reproducir la vivienda real.
+La casa será una escena pequeña de estilo ilustrado, con vista isométrica y geometrías simples. No se necesita reproducir la vivienda real. El ciclo del juego es **explorar una habitación → descubrir una tarea → hacerla en la vida real → confirmarla → ver cómo cambia la habitación**.
 
 - Cocina: platos o bolsa de basura.
 - Baño: esponja o cepillo.
@@ -158,9 +159,11 @@ La casa será una escena pequeña de estilo ilustrado, con vista isométrica y g
 
 La casa indica cuántas tareas pendientes hay en cada ambiente. En la vista general, los avatares de quienes viven allí muestran cuántas tareas de hoy hicieron, cuáles siguen pendientes y si tienen atrasadas. Seleccionar un avatar resalta las habitaciones donde tiene tareas. Al entrar en una habitación, se ven sus objetos de tareas y el responsable de cada una. Al completar una tarea, su objeto se reduce y desaparece suavemente; la sección «Hechas hoy» conserva el registro visible. Si un objeto representa varias ocurrencias pendientes, disminuye el contador y permanece hasta resolverlas.
 
-Los turnos futuros de cada ambiente aparecen en la sección «Próximamente» de esa habitación; los objetos representan las tareas de hoy y las atrasadas. Los detalles se consultan con clic o toque, sin depender de pasar el cursor.
+Los turnos futuros de cada ambiente aparecen en la sección «Próximamente» de esa habitación; los objetos representan las tareas de hoy y las atrasadas. Los detalles se consultan con clic o toque, sin depender de pasar el cursor. El estado de la habitación mejora visualmente a medida que se resuelven sus pendientes; la vista general refleja qué ambientes están al día.
 
-La casa debe permitir elegir habitaciones y restablecer la cámara. Los avatares son figuras simples, con un color identificador, y no representan la ubicación real de las personas. No incluye movimiento libre de personajes, física ni personalización de muebles. Las animaciones son breves y respetan la preferencia de movimiento reducido.
+La casa debe permitir elegir habitaciones y restablecer la cámara. El avatar propio camina por rutas definidas hacia la habitación seleccionada; la cámara lo sigue. Los demás avatares son figuras simples con nombre y color que resumen el progreso, sin representar la ubicación real de esas personas. Al confirmar una tarea, el avatar propio realiza una animación contextual breve, como recoger la bolsa de basura. No se necesita física ni movimiento libre de personajes. Las animaciones respetan la preferencia de movimiento reducido.
+
+Interactuar con un objeto abre la información de la tarea. La finalización solo se registra cuando su responsable pulsa «Ya la hice» después de realizarla fuera del juego. Un clic accidental sobre el objeto no marca la tarea como hecha. El progreso visual sigue los datos guardados en el servidor.
 
 Todas las acciones también están disponibles mediante teclado y en la lista general. El responsable y el estado se indican con texto además de color. Si WebGL no está disponible, el flujo completo funciona desde una vista de habitaciones en 2D y sus listas de tareas.
 
@@ -178,20 +181,21 @@ Todas las acciones también están disponibles mediante teclado y en la lista ge
 
 La combinación de tarea y fecha identifica de forma única cada ocurrencia. Las operaciones que completan tareas o aceptan intercambios deben ser consistentes entre dispositivos.
 
-## Dirección técnica propuesta
+## Dirección técnica
 
-- **React + TypeScript + Vite** para la aplicación web.
-- **Three.js con React Three Fiber** para la casa y las animaciones.
-- **CSS** para diseño adaptable y transiciones de interfaz.
+- **React + TypeScript + Vite** para el cliente del juego, la navegación y los paneles de tareas.
+- **Three.js con React Three Fiber y Drei** para la casa, los avatares, las interacciones y las animaciones.
+- **CSS** para paneles, formularios y diseño adaptable.
+- **Hono + TypeScript en Cloudflare Workers** como API pública: sesiones, hogares, invitaciones, tareas, rotaciones, intercambios y permisos.
 - **Cloudflare D1** como base de datos SQL del hogar, integrantes, tareas, ocurrencias, intercambios e historial.
-- **Cloudflare Workers** como API: valida sesiones y permisos, accede a D1 mediante un binding y ejecuta las reglas de turnos.
-- Acceso por enlace enviado al correo, con usuarios y sesiones gestionados por la API. La entrega de correos requiere un proveedor que se elegirá al implementar.
-- Operaciones atómicas en la API para generar ocurrencias y aceptar intercambios, con condiciones que impidan aplicar acciones duplicadas o vencidas.
+- El mismo Worker accede a D1 mediante un binding, sin otra API entre ambos.
+- Acceso por enlace enviado al correo, con usuarios y sesiones gestionados por el Worker. La entrega de correos requiere un proveedor que se elegirá al implementar.
+- Operaciones atómicas de datos para generar ocurrencias y aceptar intercambios, con condiciones que impidan aplicar acciones duplicadas o vencidas.
 - Actualización de datos al abrir o volver a la aplicación y después de cada acción; la sincronización instantánea queda fuera del MVP.
 
-La lógica de tareas y rotaciones será independiente de la escena 3D. Los datos compartidos se guardan en D1. El MVP requiere conexión; si una operación falla, la interfaz informa el error y permite reintentar sin mostrarla como completada.
+El recorrido de datos es **navegador → API Hono en un Worker → D1**. La lógica de tareas y rotaciones será independiente de la escena 3D. El MVP requiere conexión; si una operación falla, la interfaz informa el error y permite reintentar sin mostrarla como completada.
 
-El navegador no accede directamente a D1: cada operación pasa por un Worker que comprueba la identidad, la pertenencia al hogar y el permiso correspondiente. Conocer un identificador no concede acceso.
+El navegador no accede directamente a D1. El Worker comprueba la identidad, la pertenencia al hogar y los permisos antes de cada operación. Conocer un identificador no concede acceso.
 
 Este stack es una propuesta de implementación, no una lista de dependencias ya instaladas.
 
@@ -200,6 +204,7 @@ Este stack es una propuesta de implementación, no una lista de dependencias ya 
 - Varios hogares por usuario.
 - Aplicaciones nativas y funcionamiento sin conexión.
 - Chat, comentarios, archivos o fotos como comprobante.
+- Minijuegos por tarea, física, combate, monedas y niveles. El juego inicial consiste en recorrer, interactuar y transformar visualmente la casa al registrar tareas reales.
 - Notificaciones push, recordatorios externos e integraciones con calendarios.
 - Puntos, premios, castigos, rankings o medición de productividad personal.
 - Reparto según esfuerzo, disponibilidad, vacaciones o inteligencia artificial.
@@ -215,6 +220,8 @@ Este stack es una propuesta de implementación, no una lista de dependencias ya 
 - Una tarea diaria o semanal genera las ocurrencias esperadas según la zona horaria, sin duplicados.
 - La rotación respeta el orden configurado y mantiene los responsables de las ocurrencias atrasadas.
 - Completar una tarea actualiza la lista, la escena y el historial una sola vez.
+- Elegir una habitación mueve al avatar propio hasta ella; sus objetos permiten abrir tareas y solo «Ya la hice» registra una finalización.
+- La habitación refleja visualmente el progreso después de guardar una tarea y el cambio persiste al volver a entrar.
 - Cada avatar muestra las tareas de hoy completadas y pendientes, más los atrasos de su integrante; si no tiene tareas hoy, indica «Sin tareas hoy».
 - Al tocar un avatar se destacan las habitaciones con tareas pendientes de esa persona.
 - Una propuesta de intercambio no cambia responsables hasta que el destinatario la acepta.
@@ -235,7 +242,7 @@ También evaluar si los objetos de la casa ayudan a encontrar pendientes y si la
 2. Configuración de tareas, generación de ocurrencias y rotación.
 3. Lista de pendientes, finalización e historial.
 4. Solicitudes y aceptación de intercambios.
-5. Casa 3D conectada a los mismos datos.
-6. Animaciones, accesibilidad y ajustes de uso en móvil.
+5. Casa 3D, movimiento guiado del avatar y objetos conectados a los mismos datos.
+6. Reacciones visuales de las habitaciones, accesibilidad y ajustes de uso en móvil.
 
 El MVP estará completo cuando un hogar pueda coordinar sus tareas de principio a fin y se cumplan los criterios de aceptación anteriores.

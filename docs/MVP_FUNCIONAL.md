@@ -2,7 +2,7 @@
 
 ## Qué tiene que lograr el usuario
 
-Una persona crea una casa, invita a quienes viven con ella y configura tareas que se repiten. En la casa 3D ve avatares de los integrantes y el estado de sus tareas. Entra a una habitación para ver qué hay que hacer allí, completar sus tareas o intercambiar un turno. El hogar puede consultar lo realizado.
+Una persona crea una casa, invita a quienes viven con ella y configura tareas que se repiten. En este juego de navegador recorre una casa 3D con su avatar, ve a los demás integrantes y entra a una habitación para descubrir qué hay que hacer allí. Cuando completa una tarea real, la confirma y la habitación cambia. El hogar puede consultar lo realizado.
 
 El producto se organiza alrededor de una **ocurrencia**: una tarea concreta en una fecha concreta. Por ejemplo, «limpiar el baño el sábado 3» es una ocurrencia de la tarea recurrente «limpiar el baño». Completarla o intercambiarla no altera por sí solo las fechas ni los responsables de las ocurrencias posteriores.
 
@@ -17,7 +17,7 @@ El producto se organiza alrededor de una **ocurrencia**: una tarea concreta en u
 - Historial de tareas completadas e intercambios.
 - Aplicación web adaptable a móvil y escritorio.
 
-La casa 3D permite un recorrido guiado entre habitaciones mediante clic, toque o controles visibles. Los avatares muestran el progreso de cada persona; no representan su ubicación física ni requieren que alguien los controle.
+La casa 3D permite un recorrido guiado entre habitaciones mediante clic, toque o controles visibles. El avatar propio camina por rutas definidas y la cámara lo acompaña. Los avatares de las otras personas muestran su progreso; no representan su ubicación física en tiempo real.
 
 ## Flujo completo
 
@@ -76,13 +76,14 @@ Para simplificar el primer lanzamiento, el administrador configura tareas e invi
 - Al seleccionar un avatar, se abre una tarjeta con sus tareas de hoy, las atrasadas y las hechas hoy; además, se resaltan las habitaciones donde tiene pendientes.
 - Cuando alguien completa una tarea, su indicador y la habitación correspondiente se actualizan para todos los integrantes al volver a consultar los datos.
 - Cada habitación indica cuántas tareas pendientes tiene el integrante y cuántas tiene el hogar. Así se sabe adónde ir antes de entrar.
-- El usuario selecciona una habitación y la cámara se acerca con una transición breve. Allí ve el nombre del ambiente, sus tareas de hoy y las atrasadas, y quién es responsable de cada una.
+- El usuario selecciona una habitación; su avatar camina hacia ella y la cámara lo acompaña. Allí ve el nombre del ambiente, sus tareas de hoy y las atrasadas, y quién es responsable de cada una.
 - Las tareas se representan como objetos o marcadores dentro de la habitación. Al tocar uno se abre una tarjeta con nombre, fecha, responsable y acciones.
 - Si hay varias ocurrencias de la misma tarea, el marcador muestra un contador y la tarjeta permite verlas por separado.
 - Cada marcador muestra el avatar o nombre de su responsable. La sección «Hechas hoy» de la habitación permite comprobar qué se completó y quién lo hizo, aunque el objeto haya desaparecido.
 - Los próximos turnos de esa habitación aparecen en una sección plegada llamada «Próximamente», dentro de la misma vista.
 - Desde la habitación se puede agregar una tarea nueva; el ambiente queda preseleccionado en el formulario.
-- Al confirmar que una ocurrencia se completó, su objeto desaparece o reduce su contador. La habitación actualiza su número de pendientes.
+- Al tocar un objeto se abre el detalle. Solo «Ya la hice» registra una tarea que la persona realizó fuera del juego.
+- Después de guardar la finalización, el avatar hace una animación breve, el objeto se ordena o desaparece y la habitación actualiza su aspecto y su número de pendientes.
 - Botones visibles permiten volver a la vista general y pasar a otra habitación.
 - Si la habitación está al día, se muestra despejada con el mensaje «Por acá está todo listo».
 
@@ -90,7 +91,7 @@ La lista general se accede desde el menú y sirve para revisar todo el hogar de 
 
 **Regla del indicador personal:** «Hechas hoy» cuenta las ocurrencias con fecha de hoy que la persona completó; «Pendientes hoy» cuenta las que tiene asignadas hoy y siguen abiertas; «Atrasadas» cuenta sus ocurrencias abiertas de fechas anteriores. Si no tiene asignaciones hoy, el avatar dice «Sin tareas hoy», no «Todo hecho». Las tareas futuras no afectan ese indicador.
 
-**Límite visual:** habitaciones, objetos y avatares de un catálogo fijo; no se modela la vivienda real ni se representan movimientos reales de las personas. La escena respeta movimiento reducido.
+**Límite visual:** habitaciones, objetos y avatares de un catálogo fijo; no se modela la vivienda real ni se representan movimientos reales de las otras personas. La escena respeta movimiento reducido. El ciclo jugable del MVP es explorar, descubrir una tarea, hacerla en la vida real y ver la casa transformarse al registrarla.
 
 ### 4. Crear y administrar tareas
 
@@ -169,7 +170,7 @@ Dentro de cada habitación se puede alternar entre **Mis tareas** y **Todas**. L
 | Acceso | Correo, envío de enlace, nombre visible cuando corresponda |
 | Crear casa | Nombre de la casa, zona horaria, confirmación |
 | Integrantes | Lista de activos, invitaciones pendientes, formulario para invitar |
-| Inicio | Casa 3D, avatares y progreso de integrantes, pendientes por habitación y acceso a cada una |
+| Inicio | Casa 3D, avatar propio, avatares y progreso de integrantes, pendientes por habitación y acceso a cada una |
 | Habitación | Objetos de tareas, responsables con su avatar, tarjetas con acciones, hechas hoy y próximas tareas |
 | Detalle de tarea | Responsable, fecha, estado, completar, proponer intercambio |
 | Administrar tareas | Listado, plantillas, formulario, vista previa de rotación, pausar |
@@ -190,7 +191,7 @@ En móvil y escritorio, se entra primero a la casa. Al elegir una habitación se
 ## Base de datos y API
 
 - La base de datos del MVP es **Cloudflare D1**. Guarda hogares, integrantes, invitaciones, tareas, ocurrencias, solicitudes de intercambio e historial.
-- Una API en **Cloudflare Workers** recibe las acciones del navegador y accede a D1 mediante un binding. El cliente nunca consulta ni modifica D1 directamente.
+- Una API en **Cloudflare Workers con Hono y TypeScript** recibe las acciones del navegador y accede a D1 mediante un binding. El cliente nunca consulta ni modifica D1 directamente.
 - El Worker verifica la sesión, la pertenencia al hogar y los permisos antes de devolver o cambiar datos. D1 no reemplaza esta lógica de autorización.
 - La entrada por enlace de correo requiere gestionar usuarios, enlaces de un solo uso y sesiones desde la API, además de elegir un servicio que entregue los correos.
 - Completar una tarea o aceptar un intercambio debe guardar los cambios relacionados de forma atómica y comprobar que la ocurrencia sigue pendiente. Así se evitan duplicados y cambios parciales entre dispositivos.
@@ -199,6 +200,7 @@ En móvil y escritorio, se entra primero a la casa. Al elegir una habitación se
 ## Qué queda fuera
 
 - Editor detallado de casas o avatares, movimiento libre en primera persona y presencia en tiempo real.
+- Minijuegos por tarea, física, monedas y niveles. La primera mecánica jugable es recorrer habitaciones e interactuar con tareas reales.
 - Notificaciones push, recordatorios por correo y chat.
 - Tareas mensuales, tareas únicas y horarios límite configurables.
 - Sugerencias automáticas según esfuerzo o disponibilidad.
@@ -212,6 +214,6 @@ En móvil y escritorio, se entra primero a la casa. Al elegir una habitación se
 2. Tareas y rotación con vista previa.
 3. Lista de pendientes y finalización.
 4. Intercambios e historial.
-5. Casa 3D, avatares con progreso y recorrido guiado conectados a las mismas tareas.
+5. Casa 3D, recorrido guiado del avatar propio, avatares con progreso y reacción visual de las habitaciones.
 
 El paso 3 sirve para comprobar las reglas de tareas y rotación. La experiencia completa del MVP requiere los cinco pasos, incluido el recorrido por las habitaciones.
