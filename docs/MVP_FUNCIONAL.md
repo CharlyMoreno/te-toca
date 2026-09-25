@@ -233,3 +233,7 @@ El paso 3 sirve para comprobar las reglas de tareas y rotación. La experiencia 
 ## Reacciones sobre personajes
 
 Hacer clic en un personaje abre las acciones 😡 enojarme, 🖕 fuck you, 👍 like y ❤️ corazón. El emoji aparece sobre el avatar de quien reacciona y se comparte con los conectados del hogar. Dura unos tres segundos, no modifica puntos y no queda como historial. El menú también permite consultar las tareas del personaje seleccionado.
+
+## Charla temporal
+
+El botón «Charlar» abre un campo de hasta 160 caracteres. Enter o Enviar publica el mensaje por el socket privado del hogar. El texto aparece ocho segundos sobre el avatar del autor y reemplaza su globo anterior. El panel muestra los últimos treinta mensajes recibidos durante la sesión; no guarda historial ni entrega mensajes fuera de línea. La identidad y pertenencia al hogar se validan en el servidor, el texto se renderiza como texto plano y el campo se conserva si el envío falla.

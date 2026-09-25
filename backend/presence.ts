@@ -1,3 +1,4 @@
+import { chatText, type ChatMessage } from '../shared/chat'
 import { emotes, type EmoteEvent, type Emote } from '../shared/emotes'
 import { Hono } from 'hono'
 import { requireUser } from './security'
@@ -7,7 +8,7 @@ import type { AppEnv } from './types'
 type Connection = {
   userId: string; homeId: string; sessionHash: string;
   room: string | null; active: boolean; movedAt: number; seenAt: number;
-  windowStart: number; messages: number; lastEmoteAt?: number;
+  windowStart: number; messages: number; lastEmoteAt?: number; lastChatAt?: number;
 }
 const roomIds = ['kitchen', 'bathroom', 'bedroom', 'living']
 const timeout = 70_000
@@ -83,9 +84,25 @@ export class HousePresence implements DurableObject {
     const data = this.data(ws), timestamp = Date.now()
     if (timestamp - data.windowStart > 10_000) { data.windowStart = timestamp; data.messages = 0 }
     if (++data.messages > 60) { ws.close(1008, 'Too many messages'); this.snapshot(ws); return }
-    let event: { type?: unknown; room?: unknown; active?: unknown; emoji?: unknown; targetId?: unknown }
+    let event: { type?: unknown; room?: unknown; active?: unknown; emoji?: unknown; targetId?: unknown; text?: unknown; requestId?: unknown }
     try { event = JSON.parse(message) } catch { ws.close(1008, 'Invalid message'); this.snapshot(ws); return }
-    if (!event || (event.type !== 'ping' && event.type !== 'move' && event.type !== 'emote')) { ws.close(1008, 'Invalid message'); this.snapshot(ws); return }
+    if (!event || (event.type !== 'ping' && event.type !== 'move' && event.type !== 'emote' && event.type !== 'chat')) { ws.close(1008, 'Invalid message'); this.snapshot(ws); return }
+    if (event.type === 'chat') {
+      if(typeof event.requestId!=='string' || !/^[a-zA-Z0-9-]{1,64}$/.test(event.requestId)) {
+        ws.close(1008,'Invalid chat request');this.snapshot(ws);return
+      }
+      const reject=(error:string)=>ws.send(JSON.stringify({type:'chat-error',requestId:event.requestId,error}))
+      const text=chatText(event.text)
+      if(!text){reject('Escribí un mensaje de hasta 160 caracteres.');return}
+      if(timestamp-(data.lastChatAt??0)<1500){reject('Esperá un instante antes de enviar otro mensaje.');return}
+      data.lastChatAt=timestamp;data.seenAt=timestamp;ws.serializeAttachment(data)
+      if(!await this.authorized(data)){ws.close(4001,'Session ended');this.snapshot(ws);return}
+      if(ws.readyState!==1)return
+      const chat:ChatMessage={id:crypto.randomUUID(),userId:data.userId,text}
+      this.broadcast({type:'chat',message:chat})
+      ws.send(JSON.stringify({type:'chat-sent',requestId:event.requestId}))
+      return
+    }
     if (event.type === 'emote') {
       if (!emotes.some(item=>item.emoji===event.emoji) || typeof event.targetId!=='string' || event.targetId.length>64) {
         ws.close(1008,'Invalid reaction');this.snapshot(ws);return

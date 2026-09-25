@@ -1,3 +1,5 @@
+import { chatBubbleDuration, type ChatMessage } from '../../../shared/chat'
+import HouseChat from './HouseChat'
 import { emotes, type Emote, type EmoteEvent } from '../../../shared/emotes'
 import type { GameEvent, Score } from '../../../shared/game'
 import { Component, lazy, Suspense, useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
@@ -35,6 +37,8 @@ function Dialog({ title, children, close }: { title: string; children: ReactNode
 }
 
 export default function GameHouse({ home, user, members: initialMembers, onLogout, authError }: { home: House; user: Person; members: Person[]; onLogout: () => void; authError: string }) {
+  const [messages,setMessages]=useState<ChatMessage[]>([])
+  const [speech,setSpeech]=useState<(ChatMessage&{expiresAt:number})[]>([])
   const [character,setCharacter]=useState<string|null>(null)
   const [reactions,setReactions]=useState<(EmoteEvent&{expiresAt:number})[]>([])
   const [members,setMembers]=useState(initialMembers)
@@ -97,7 +101,16 @@ export default function GameHouse({ home, user, members: initialMembers, onLogou
   const receiveEmote=useCallback((event:EmoteEvent)=>{
     setReactions(previous=>[...previous.filter(item=>item.userId!==event.userId),{...event,expiresAt:Date.now()+3200}])
   },[])
-  const presence=usePresence(home.id,room,realtimeRefresh,receiveEvent,receiveEmote)
+  const receiveChat=useCallback((message:ChatMessage)=>{
+    setMessages(previous=>[...previous,message].slice(-30))
+    setSpeech(previous=>[...previous.filter(item=>item.userId!==message.userId),{...message,expiresAt:Date.now()+chatBubbleDuration}])
+  },[])
+  const presence=usePresence(home.id,room,realtimeRefresh,receiveEvent,receiveEmote,receiveChat)
+  useEffect(()=>{
+    if(!speech.length)return
+    const timer=setTimeout(()=>setSpeech(previous=>previous.filter(item=>item.expiresAt>Date.now())),Math.max(0,Math.min(...speech.map(item=>item.expiresAt))-Date.now()))
+    return ()=>clearTimeout(timer)
+  },[speech])
   useEffect(()=>{
     if(!reactions.length)return
     const timeout=setTimeout(()=>setReactions(previous=>previous.filter(item=>item.expiresAt>Date.now())),Math.max(0,Math.min(...reactions.map(item=>item.expiresAt))-Date.now()))
@@ -176,7 +189,7 @@ export default function GameHouse({ home, user, members: initialMembers, onLogou
         <nav className="room-navigation" aria-label="Ir a una habitación"><button className={!room?'active':''} aria-pressed={!room} onClick={()=>{chooseRoom(null);setCameraRevision(value=>value+1)}}><GameIcon name="home" /><span>Casa</span></button>{rooms.map(r=><button key={r.id} className={room===r.id?'active':''} aria-pressed={room===r.id} onClick={()=>chooseRoom(r.id)}><GameIcon name={r.id} /><span>{r.name}</span></button>)}</nav>
         <div className="world-canvas">
           {flat?<div className="room-grid">{rooms.map(r=><button key={r.id} style={{borderColor:r.color}} onClick={()=>chooseRoom(r.id)}><span>{r.name}</span><strong>{tasks.filter(t=>t.room===r.id&&!t.completed_at&&t.due_date<=today).length}</strong><small>tareas pendientes</small></button>)}</div>:
-            <SceneBoundary><Suspense fallback={<div className="scene-fallback">Abriendo las puertas de tu casa…</div>}><HouseScene reactions={reactions} character={character} event={gameEvent} panelOpen={panelOpen} online={presence.people} cameraRevision={cameraRevision} room={room} people={members} self={user.id} tasks={tasks} today={today} focus={focus} celebration={celebration} reduced={reduced} onRoom={chooseRoom} onTask={chooseTask} onPerson={id=>setCharacter(character===id?null:id)} /></Suspense></SceneBoundary>}
+            <SceneBoundary><Suspense fallback={<div className="scene-fallback">Abriendo las puertas de tu casa…</div>}><HouseScene speech={speech} reactions={reactions} character={character} event={gameEvent} panelOpen={panelOpen} online={presence.people} cameraRevision={cameraRevision} room={room} people={members} self={user.id} tasks={tasks} today={today} focus={focus} celebration={celebration} reduced={reduced} onRoom={chooseRoom} onTask={chooseTask} onPerson={id=>setCharacter(character===id?null:id)} /></Suspense></SceneBoundary>}
           <div className="scene-toolbar"><button className="scene-add" aria-label="Crear tarea" onClick={()=>newTask()}><GameIcon name="plus" /><span>Crear tarea</span></button><button aria-label={panelOpen?'Cerrar tareas':'Ver tareas'} onClick={()=>setPanelOpen(value=>!value)} aria-expanded={panelOpen} aria-controls="house-tasks"><GameIcon name="tasks" /><span>Tareas</span>{ownPending>0&&<b>{ownPending}</b>}</button></div>
           {loading&&<div className="scene-loading">Cargando tareas…</div>}
         </div>
@@ -196,6 +209,7 @@ export default function GameHouse({ home, user, members: initialMembers, onLogou
     {(error||authError)&&<div className="game-error" role="alert">{error||authError}<button onClick={()=>{setError('');void refresh().catch(e=>setError(e.message))}}>Reintentar</button></div>}
     {undo&&<div className="game-toast" role="status"><span>✓ {undo.title}</span><button disabled={busy} onClick={()=>void act(async()=>{const result=await request<{event:GameEvent}>(`/tasks/${encodeURIComponent(undo.id)}/undo`,'POST',{});receiveEvent(result.event);setUndo(null);setCelebration(null);await refresh()})}>Deshacer</button></div>}
     {gameEvent&&<div className={`live-event ${gameEvent.kind.replace('.','-')}`} role="status"><span>{gameEvent.kind==='task.created'?'✦':gameEvent.kind==='task.nudged'?'📣':gameEvent.kind==='task.completed'?'★':'↶'}</span><div><strong>{gameEvent.kind==='task.created'?`${gameEvent.actorName} agregó una tarea`:gameEvent.kind==='task.nudged'?`${gameEvent.actorName}: ¡${name(gameEvent.targetId)}, te toca!`:gameEvent.kind==='task.completed'?`${gameEvent.actorName} sumó ${gameEvent.points} puntos`:`${gameEvent.actorName} deshizo una tarea`}</strong><small>{gameEvent.title}</small></div><button onClick={()=>{setFocus(null);setRoom(gameEvent.room);setPanelOpen(true);setSelected(gameEvent.occurrenceId);setTab(gameEvent.kind==='task.completed'?'done':(tasks.find(t=>t.id===gameEvent.occurrenceId)?.due_date??today)>today?'upcoming':'pending')}}>Ver</button></div>}
+    <HouseChat messages={messages} people={members} self={user.id} status={presence.status} send={presence.sendChat} />
     {character&&<div className="emote-picker" role="dialog" aria-label={`Acciones con ${name(character)}`}><header><strong>{name(character)}</strong><button aria-label="Cerrar reacciones" onClick={()=>setCharacter(null)}>×</button></header><div>{emotes.map(item=><button key={item.emoji} onClick={()=>react(item.emoji)} title={item.label} aria-label={item.label}><span>{item.emoji}</span><small>{item.label}</small></button>)}</div><footer><span>La reacción sale sobre tu personaje</span><button onClick={()=>{setFocus(character);setPanelOpen(true);setCharacter(null)}}>Ver tareas →</button></footer></div>}
     {dialog==='menu'&&<Dialog title={home.name} close={close}><div className="menu-progress"><span>Hoy completamos</span><strong>{done} / {daily.length}</strong><progress value={done} max={daily.length||1} /></div><div className="game-menu"><button onClick={()=>setDialog('avatar')}><GameIcon name="avatar" />Mi personaje<span>→</span></button><button onClick={()=>setDialog('invite')}><GameIcon name="people" />Integrantes<span>{members.length}</span></button><button onClick={()=>setDialog('scores')}><GameIcon name="trophy" />Puntajes<span>→</span></button><button onClick={openHistory}><GameIcon name="history" />Historial<span>→</span></button>{home.role==='admin'&&<button onClick={()=>setDialog('routines')}><GameIcon name="settings" />Rutinas<span>→</span></button>}<button onClick={()=>{setFlat(value=>!value);close()}}><GameIcon name="view" />{flat?'Volver al 3D':'Usar vista simple'}<span>→</span></button><button onClick={onLogout}><GameIcon name="exit" />Salir<span>→</span></button></div><p className="menu-help">Tocá una habitación para entrar y un objeto para ver su tarea. Arrastrá para girar; usá la rueda o un pellizco para acercarte.</p></Dialog>}
     {dialog==='scores'&&<Dialog title="Puntos de la casa" close={close}><p>★ {scores.reduce((total,score)=>total+score.points,0)} puntos entre todos. Cada tarea completada suma; deshacer revierte sus puntos.</p><div className="scoreboard">{scores.map((score,index)=><article key={score.userId}><span>{index===0&&score.points>0?'🏆':index+1}</span><div><strong>{name(score.userId)}{score.userId===user.id?' (vos)':''}</strong><small>{score.completed} tareas completadas</small></div><b>{score.points}<small>puntos</small></b></article>)}</div></Dialog>}

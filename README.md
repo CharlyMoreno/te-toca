@@ -273,6 +273,12 @@ Al entrar, el navegador abre `/api/presence` con su cookie de sesión. El Worker
 - Al perder red se borra el listado de presencia y se muestra la reconexión. Los latidos son cada veinte segundos; una conexión abandonada se descarta tras setenta segundos, en la siguiente revisión de treinta segundos. Las sesiones se revalidan en esas revisiones.
 - Los cambios de tareas y apariencia se guardan primero por HTTP en D1. Después, un aviso por socket hace que los clientes consulten nuevamente los datos autorizados. No se completan tareas mediante mensajes de socket.
 
+### Charlar en la casa
+
+**Charlar**, abajo a la izquierda, abre el chat. Escribí hasta 160 caracteres y presioná Enter o el botón de enviar: el mensaje aparece ocho segundos sobre tu personaje y lo ven todos los conectados de la casa. Un nuevo mensaje de la misma persona reemplaza su globo anterior. El panel conserva los últimos treinta mensajes recibidos durante la sesión, para poder leer a quienes estén fuera del encuadre; no hay historial persistente ni entrega a personas desconectadas.
+
+El servidor obtiene el autor de la sesión del socket y valida su membresía antes de difundir texto plano. No interpreta HTML ni permite elegir otro autor. Hay un intervalo mínimo de 1,5 segundos por conexión. El campo se vacía al recibir la confirmación; si se corta la conexión o falla el envío, conserva el texto. Al mostrarse un mensaje sobre un personaje se ocultan temporalmente sus emojis y globos de reacción para evitar superposiciones. No requiere migraciones nuevas de D1.
+
 ### Reacciones de personaje
 
 Al hacer clic en un personaje aparece un menú con **😡 enojarme, 🖕 fuck you, 👍 like y ❤️ corazón**, además de acceso a sus tareas. El emoji elegido flota sobre el avatar de quien lo envía, incluso si hizo clic en otro integrante. Todos los conectados de esa casa ven la reacción durante unos tres segundos. Los personajes siguen sin cambiar su puntaje por reaccionar.
@@ -291,7 +297,7 @@ La presencia usa la [API de WebSockets con hibernación de Cloudflare](https://d
 
 - Varios hogares por usuario.
 - Aplicaciones nativas y funcionamiento sin conexión.
-- Chat, comentarios, archivos o fotos como comprobante.
+- Comentarios persistentes sobre tareas, archivos o fotos como comprobante. La charla temporal de la casa sí está incluida.
 - Minijuegos por tarea, física, combate, monedas y niveles. El juego inicial consiste en recorrer, interactuar y transformar visualmente la casa al registrar tareas reales.
 - Notificaciones push, recordatorios externos e integraciones con calendarios.
 - Premios materiales, descuentos automáticos de puntos por atrasos y estadísticas de productividad personal. El puntaje lúdico por tareas sí está incluido.

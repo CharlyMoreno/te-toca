@@ -1,3 +1,4 @@
+import type { ChatMessage } from '../../../shared/chat'
 import type { EmoteEvent } from '../../../shared/emotes'
 import type { GameEvent } from '../../../shared/game'
 import { AvatarEffect, RoomBeacon } from './GameEffects'
@@ -12,7 +13,7 @@ import { rooms, type Occurrence, type Person, type RoomId } from './model'
 
 type V3 = [number, number, number]
 type Props = {
-  reactions: EmoteEvent[]; character: string|null; event: GameEvent | null; panelOpen: boolean; room: RoomId | null; online: OnlinePerson[]; people: Person[]; self: string; tasks: Occurrence[]; today: string;
+  speech: ChatMessage[]; reactions: EmoteEvent[]; character: string|null; event: GameEvent | null; panelOpen: boolean; room: RoomId | null; online: OnlinePerson[]; people: Person[]; self: string; tasks: Occurrence[]; today: string;
   cameraRevision: number; focus: string | null; celebration: string | null; reduced: boolean;
   onRoom: (room: RoomId | null) => void; onTask: (task: Occurrence) => void; onPerson: (id: string) => void
 }
@@ -102,9 +103,9 @@ function Living() {
     <Plant p={[-2,0,-1.9]} size={1.2} />
   </>
 }
-function Avatar({ person, index, room, own, reduced, reaction, pending, completed, scheduled, overdue, selected, presenceLabel, emote, onClick }: {
+function Avatar({ person, index, room, own, reduced, reaction, pending, completed, scheduled, overdue, selected, presenceLabel, emote, speech, onClick }: {
   person: Person; index: number; room: RoomId | null; own: boolean; reduced: boolean; reaction: GameEvent | null;
-  emote?:EmoteEvent; presenceLabel: string; pending: number; completed: number; scheduled: number; overdue: number; selected: boolean; onClick: () => void
+  speech?:ChatMessage; emote?:EmoteEvent; presenceLabel: string; pending: number; completed: number; scheduled: number; overdue: number; selected: boolean; onClick: () => void
 }) {
   const ref = useRef<THREE.Group>(null)
   const body = useRef<THREE.Group>(null)
@@ -154,8 +155,9 @@ function Avatar({ person, index, room, own, reduced, reaction, pending, complete
   return <group ref={ref} position={spawn} onClick={e=>{e.stopPropagation();onClick()}}>
     <group ref={body}><AvatarModel avatar={person.avatar ?? defaultAvatar} walking={walkingRef} reduced={reduced} mood={reaction?.kind==='task.completed'?'celebrate':reaction?.kind==='task.nudged'?'nudge':'idle'} /></group>
     <mesh rotation-x={-Math.PI/2} position={[0,.018,0]}><ringGeometry args={[.34,.41,32]} /><meshBasicMaterial color={selected || own ? '#af92d7' : '#e3dcd4'} transparent opacity={.9} /></mesh>
-    {emote&&<Html key={emote.id} center zIndexRange={[27,0]} position={[0,2.8,0]}><span className="avatar-emote" role="img" aria-label={emote.emoji}>{emote.emoji}</span></Html>}
-    {reaction&&!emote&&<AvatarEffect key={reaction.id} event={reaction} reduced={reduced} />}
+    {speech&&<Html key={speech.id} center zIndexRange={[28,0]} position={[0,2.7,0]}><div className="avatar-speech">{speech.text}</div></Html>}
+    {emote&&!speech&&<Html key={emote.id} center zIndexRange={[27,0]} position={[0,2.8,0]}><span className="avatar-emote" role="img" aria-label={emote.emoji}>{emote.emoji}</span></Html>}
+    {reaction&&!emote&&!speech&&<AvatarEffect key={reaction.id} event={reaction} reduced={reduced} />}
     <Html zIndexRange={[20, 0]} center position={[0,1.95,0]} style={{pointerEvents:'auto'}}><button className={`person-tag ${selected?'focused':''}`} onClick={onClick} title={`${person.display_name} · ${presenceLabel} · ${completed}/${scheduled} hechas hoy · ${pending} pendientes · ${overdue} atrasadas`}><i className={presenceLabel.includes('En línea')?'online':'away'} />{person.display_name}{own && ' · vos'}</button></Html>
   </group>
 }
@@ -253,7 +255,7 @@ export default function HouseScene(props: Props) {
       completed={props.tasks.filter(t=>t.completed_at && t.due_date===props.today && t.assignee===person.id).length}
       scheduled={props.tasks.filter(t=>t.due_date===props.today && t.assignee===person.id).length}
       overdue={props.tasks.filter(t=>!t.completed_at && t.due_date<props.today && t.assignee===person.id).length}
-      emote={props.reactions.find(item=>item.userId===person.id)} selected={props.character===person.id||props.focus===person.id} onClick={()=>props.onPerson(person.id)} />)}
+      speech={props.speech.find(item=>item.userId===person.id)} emote={props.reactions.find(item=>item.userId===person.id)} selected={props.character===person.id||props.focus===person.id} onClick={()=>props.onPerson(person.id)} />)}
     <ViewCamera panelOpen={props.panelOpen} key={props.cameraRevision} room={props.room} reduced={props.reduced} />
   </Canvas>
 }

@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react'
-export type IconName = 'home'|'kitchen'|'bathroom'|'bedroom'|'living'|'tasks'|'plus'|'menu'|'trophy'|'people'|'avatar'|'history'|'view'|'exit'|'settings'
+export type IconName = 'chat'|'home'|'kitchen'|'bathroom'|'bedroom'|'living'|'tasks'|'plus'|'menu'|'trophy'|'people'|'avatar'|'history'|'view'|'exit'|'settings'
 const paths: Record<IconName, string> = {
+  chat: 'M5 3h14a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H9l-6 4V5a2 2 0 0 1 2-2ZM7 8h10M7 12h7',
   home: 'm3 10 9-7 9 7M5 9v12h14V9M9 21v-8h6v8',
   kitchen: 'M5 3v6a3 3 0 0 0 6 0V3M8 3v18M18 3c-3 3-3 8 0 9h2V3h-2Zm2 9v9',
   bathroom: 'M3 12h18v4a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4v-4Zm2 0V5a2 2 0 0 1 4 0M7 20v2m10-2v2M8 6h3',

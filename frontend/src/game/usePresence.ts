@@ -1,3 +1,4 @@
+import { chatText, type ChatMessage } from '../../../shared/chat'
 import type { Emote, EmoteEvent } from '../../../shared/emotes'
 import type { GameEvent } from '../../../shared/game'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -5,7 +6,7 @@ import type { RoomId } from './model'
 
 export type OnlinePerson = { userId: string; room: RoomId | null; active: boolean }
 export type ConnectionStatus = 'connecting' | 'connected' | 'reconnecting' | 'offline' | 'expired'
-export function usePresence(homeId: string, room: RoomId | null, onChanged: () => void, onEvent: (event: GameEvent) => void, onEmote: (event: EmoteEvent) => void) {
+export function usePresence(homeId: string, room: RoomId | null, onChanged: () => void, onEvent: (event: GameEvent) => void, onEmote: (event: EmoteEvent) => void, onChat: (message: ChatMessage) => void) {
   const [people, setPeople] = useState<OnlinePerson[]>([])
   const [status, setStatus] = useState<ConnectionStatus>('connecting')
   const socket = useRef<WebSocket | null>(null)
@@ -14,6 +15,9 @@ export function usePresence(homeId: string, room: RoomId | null, onChanged: () =
   const gameEvent = useRef(onEvent)
   const emoteEvent = useRef(onEmote)
   const lastEmote=useRef(0)
+  const chatEvent=useRef(onChat)
+  const pendingChats=useRef(new Map<string,{resolve:()=>void;reject:(error:Error)=>void;timer:ReturnType<typeof setTimeout>}>())
+  useEffect(()=>{chatEvent.current=onChat},[onChat])
   useEffect(()=>{emoteEvent.current=onEmote},[onEmote])
   useEffect(() => { gameEvent.current = onEvent }, [onEvent])
   useEffect(() => { changed.current = onChanged }, [onChanged])
@@ -50,7 +54,12 @@ export function usePresence(homeId: string, room: RoomId | null, onChanged: () =
         lastMessage = Date.now()
         try {
           const data = JSON.parse(event.data)
-          if (data.type === 'presence' && Array.isArray(data.people)) setPeople(data.people)
+          if(data.type==='chat' && data.message) chatEvent.current(data.message)
+          if(data.type==='chat-sent' || data.type==='chat-error') {
+            const pending=pendingChats.current.get(data.requestId)
+            if(pending){clearTimeout(pending.timer);pendingChats.current.delete(data.requestId);if(data.type==='chat-sent')pending.resolve();else pending.reject(new Error(data.error??'No se pudo enviar.'))}
+          }
+          if (data.type === 'presence'  && Array.isArray(data.people)) setPeople(data.people)
           if (data.type === 'emote' && data.event) emoteEvent.current(data.event)
           if (data.type === 'game' && data.event) gameEvent.current(data.event)
           if (data.type === 'changed' || data.type === 'game') {
@@ -63,6 +72,8 @@ export function usePresence(homeId: string, room: RoomId | null, onChanged: () =
       ws.onclose = event => {
         if (socket.current !== ws) return
         socket.current = null
+        for(const pending of pendingChats.current.values()){clearTimeout(pending.timer);pending.reject(new Error('Se perdió la conexión. Tu texto sigue acá.'))}
+        pendingChats.current.clear()
         if (disposed) return
         setPeople([])
         if (event.code === 4001) { expired = true; setStatus('expired'); return }
@@ -87,7 +98,10 @@ export function usePresence(homeId: string, room: RoomId | null, onChanged: () =
     document.addEventListener('visibilitychange', visibility)
     connect()
     return () => {
-      disposed = true; clearTimeout(retry); clearTimeout(refresh); clearInterval(heartbeat)
+      disposed = true
+      for(const pending of pendingChats.current.values()){clearTimeout(pending.timer);pending.reject(new Error('Saliste de la casa.'))}
+      pendingChats.current.clear()
+      clearTimeout(retry); clearTimeout(refresh); clearInterval(heartbeat)
       const ws = socket.current; socket.current = null; ws?.close(1000, 'Left house')
       window.removeEventListener('online', show); window.removeEventListener('offline', offline)
       window.removeEventListener('pagehide', hide); window.removeEventListener('pageshow', show)
@@ -100,5 +114,16 @@ export function usePresence(homeId: string, room: RoomId | null, onChanged: () =
     socket.current.send(JSON.stringify({type:'emote',emoji,targetId}))
     return true
   },[])
-  return { people, status, sendEmote }
+  const sendChat=useCallback((value:string):Promise<void>=>{
+    const text=chatText(value),ws=socket.current
+    if(!text)return Promise.reject(new Error('Escribí un mensaje de hasta 160 caracteres.'))
+    if(ws?.readyState!==WebSocket.OPEN)return Promise.reject(new Error('Esperá a que vuelva la conexión para enviar.'))
+    const requestId=crypto.randomUUID()
+    return new Promise((resolve,reject)=>{
+      const timer=setTimeout(()=>{pendingChats.current.delete(requestId);reject(new Error('No llegó la confirmación. Revisá la charla antes de reenviar.'))},8000)
+      pendingChats.current.set(requestId,{resolve,reject,timer})
+      try{ws.send(JSON.stringify({type:'chat',text,requestId}))}catch{clearTimeout(timer);pendingChats.current.delete(requestId);reject(new Error('No se pudo enviar. Tu texto sigue acá.'))}
+    })
+  },[])
+  return { people, status, sendEmote, sendChat }
 }
