@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { auth } from './auth'
 import { homes } from './homes'
+import { tasks } from './tasks'
 import type { AppEnv } from './types'
 
 const app = new Hono<AppEnv>()
@@ -24,6 +25,7 @@ app.use('/api/*', async (c, next) => {
 
 app.route('/api/auth', auth)
 app.route('/api/homes', homes)
+app.route('/api/tasks', tasks)
 app.notFound((c) => c.json({ error: 'Ruta no encontrada.' }, 404))
 app.onError((error, c) => {
   console.error('API error', error)

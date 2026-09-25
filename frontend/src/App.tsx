@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import GameHouse from './game/GameHouse'
 
 type User = { id: string; display_name: string }
 type Home = { id: string; name: string; timezone: string; role: 'admin' | 'member' }
@@ -160,6 +161,10 @@ export default function App() {
   }
 
   const isAuthenticated = Boolean(user)
+
+  if (screen === 'home' && home && user) {
+    return <GameHouse home={home} user={user} members={members} onLogout={logout} authError={error} />
+  }
 
   return (
     <div className="app-shell">

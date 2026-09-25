@@ -7,9 +7,9 @@ Te Toca es un juego de navegador para parejas y compañeros de vivienda que orga
 El jugador recorre una pequeña casa 3D con su avatar. En cada habitación encuentra objetos que representan tareas reales. Al confirmar que hizo una, el avatar interactúa con el objeto y el ambiente se ordena. Los avatares de los demás integrantes muestran sus tareas hechas, pendientes y atrasadas.
 
 La definición de pantallas, flujos y reglas de uso está en [la especificación funcional del MVP](docs/MVP_FUNCIONAL.md).
-El [modelo de datos](docs/DB_MODEL.md) separa el esquema de acceso ya creado de las tablas previstas para las tareas.
+El [modelo de datos](docs/DB_MODEL.md) documenta las migraciones de acceso, hogares, tareas y turnos.
 
-Estado: primer módulo implementado (acceso, creación de casa y unión por código). El recorrido 3D, las tareas y los intercambios siguen definidos para el MVP. Te Toca es el nombre propuesto; su disponibilidad comercial y de dominio no fue verificada.
+Estado: acceso, hogares, casa 3D, avatares, tareas recurrentes, turnos automáticos, finalización, deshacer e historial implementados. Los intercambios y la edición de rutinas siguen pendientes; el MVP completo todavía está en desarrollo. Te Toca es el nombre propuesto; su disponibilidad comercial y de dominio no fue verificada.
 
 ## Problema
 
@@ -199,7 +199,7 @@ El recorrido de datos es **navegador → API Hono en un Worker → D1**. La lóg
 
 El navegador no accede directamente a D1. El Worker comprueba la identidad, la pertenencia al hogar y los permisos antes de cada operación. Conocer un identificador no concede acceso.
 
-Este stack es una propuesta de implementación, no una lista de dependencias ya instaladas.
+React, Three.js, React Three Fiber, Drei y Hono ya están instalados. La escena se carga bajo demanda al entrar a una casa.
 
 ## Despliegue en Cloudflare
 
@@ -211,13 +211,28 @@ Las credenciales se configuran localmente en `.env.local`, excluido de Git, o me
 
 ## Estado del código y desarrollo local
 
-El código está organizado en [`frontend/`](frontend/) y [`backend/`](backend/). La primera migración de D1 define `users`, `access_keys`, `sessions`, `auth_rate_limits`, `homes`, `home_members` y `home_invites`. La lógica de tareas todavía no tiene tablas ni endpoints: se implementará en los siguientes módulos.
+El código está organizado en [`frontend/`](frontend/) y [`backend/`](backend/). La primera migración de D1 define `users`, `access_keys`, `sessions`, `auth_rate_limits`, `homes`, `home_members` y `home_invites`. La segunda migración, `0002_tasks.sql`, incorpora `tasks`, `task_participants`, `task_occurrences` y `activity_events`. La API `/api/tasks` genera turnos al consultar la casa, conserva atrasos y prepara los próximos siete días.
 
 ```bash
 npm install
 npm run db:migrate:local
 npm run dev
 ```
+
+### Usar la casa 3D
+
+1. Abrí la dirección que imprime Vite al ejecutar `npm run dev`.
+2. Entrá con tu clave personal o creá un perfil y una casa.
+3. Usá **Nueva tarea** para elegir habitación, objeto, frecuencia, fecha inicial y participantes de la rotación.
+4. Tocá una habitación: la cámara se acerca y tu avatar camina hasta ella. Arrastrá para girar la cámara; usá la rueda o un pellizco para acercar. **Ver toda la casa** restablece la vista.
+5. Tocá los objetos para abrir su tarea. **Ya la hice** guarda la finalización, retira el objeto y anima al avatar. Hay diez segundos para deshacer.
+6. Elegí un integrante para filtrar sus pendientes; consultá **Hechas**, **Próximas** e **Historial** para ver el resto.
+
+La escena usa modelos geométricos propios, sin descargas de modelos externos. Muestra hasta seis objetos pendientes por habitación; todas las ocurrencias están disponibles en la lista. Los demás avatares resumen progreso, sin indicar presencia en línea ni ubicación real. Los datos se actualizan al volver a la pestaña y después de cada acción.
+
+**Vista simple** permite usar las habitaciones sin 3D. La navegación por botones y listas funciona con teclado; las animaciones respetan la preferencia de movimiento reducido. La celebración actual es un salto breve; las animaciones específicas de limpieza por objeto quedan pendientes.
+
+Pausar una rutina detiene la generación de turnos nuevos; los ya generados permanecen. Por ahora no hay edición ni reactivación desde la interfaz.
 
 El entorno local usa una base D1 simulada. Para desplegar, se debe crear la base D1 real, reemplazar el `database_id` de ejemplo en `wrangler.jsonc`, aplicar las migraciones remotas y publicar el Worker. Ninguna clave personal ni código de casa se guarda en texto legible: solo se almacenan sus hashes. La clave personal se muestra una vez al crear el perfil; si se pierde y la sesión vence, esta primera versión no puede recuperar la cuenta.
 

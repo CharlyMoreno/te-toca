@@ -1,6 +1,6 @@
 # Modelo de datos — Te Toca
 
-La base elegida es **Cloudflare D1**. Este documento distingue las tablas ya creadas para el acceso de las que se agregarán cuando implementemos las tareas. La fuente exacta del esquema actual es [`backend/migrations/0001_auth.sql`](../backend/migrations/0001_auth.sql).
+La base elegida es **Cloudflare D1**. Las fuentes del esquema actual son [`0001_auth.sql`](../backend/migrations/0001_auth.sql) y [`0002_tasks.sql`](../backend/migrations/0002_tasks.sql).
 
 ## Implementado: acceso y casa
 
@@ -28,18 +28,21 @@ Al crear un perfil, la API guarda usuario, hash de la clave y sesión. La clave 
 
 La sesión se envía en una cookie `HttpOnly`, `SameSite=Lax` y `Secure` cuando la aplicación usa HTTPS. El navegador no recibe credenciales de D1.
 
-## Previsto para los siguientes módulos
+## Implementado: tareas y turnos
 
-Estas entidades aún **no tienen migración ni endpoints**:
+| Tabla | Función y restricciones |
+| --- | --- |
+| `tasks` | Hogar, título, habitación, objeto, frecuencia diaria/semanal, fecha inicial y estado activo. |
+| `task_participants` | Usuarios de la casa participantes, con posición única por tarea. |
+| `task_occurrences` | Fecha, responsable original y actual, finalización y clave de última operación. Combinación tarea–fecha única. |
+| `activity_events` | Historial de finalizaciones y acciones de deshacer, con hogar, actor y ocurrencia. |
 
-| Entidad prevista | Relación principal | Función |
-| --- | --- | --- |
-| `tasks` | Pertenece a `homes` y a una habitación | Nombre, icono, frecuencia, primera fecha y estado. |
-| `task_participants` | Relaciona `tasks` con `home_members` | Orden de la rotación de responsables. |
-| `task_occurrences` | Pertenece a `tasks` | Fecha concreta, responsable original y actual, estado y finalización. La combinación tarea–fecha será única. |
-| `task_swaps` | Referencia dos `task_occurrences` | Propuesta, respuesta y estado del intercambio. |
-| `activity_events` | Referencia hogar y actor | Registro de tareas hechas, deshechas e intercambios. |
+Las habitaciones son valores controlados: `kitchen`, `bathroom`, `bedroom`, `living`. La escena traduce sus nombres al español. Las posiciones, muebles, colores y animaciones viven en el frontend.
 
-La habitación puede ser un valor controlado de la tarea (`cocina`, `bano`, `dormitorio`, `comun`) mientras la casa tenga cuatro ambientes fijos. Cuando se habilite personalizar habitaciones, se podrá crear una tabla propia y migrar esos valores.
+Al consultar las tareas, la API genera ocurrencias hasta siete días después de la fecha actual del hogar. El responsable se calcula desde la fecha inicial y el orden de participantes. Las inserciones son idempotentes por tarea y fecha; los atrasos conservan su responsable. Una pausa detiene la generación futura, sin borrar turnos ya generados.
 
-Los modelos 3D, las posiciones de objetos y las animaciones serán recursos del cliente. D1 guardará los datos del juego que afectan a todos: qué tareas existen, quién debe hacerlas y cuáles se completaron.
+Completar solo está permitido al responsable, dentro de su casa y para fechas actuales o pasadas. La actualización condicional y el evento se escriben juntos mediante `DB.batch`; una clave de operación evita registrar eventos duplicados. Deshacer requiere el mismo responsable y un plazo de diez segundos. La lista conserva finalizaciones de los últimos treinta días; el historial entrega los últimos cien eventos.
+
+## Pendiente
+
+`task_swaps` todavía no tiene migración ni endpoints. Se incorporará con el flujo de propuestas y aceptación atómica de intercambios. También falta la edición de rutinas y su reactivación. El valor `swapped` del historial está reservado para esa implementación.
