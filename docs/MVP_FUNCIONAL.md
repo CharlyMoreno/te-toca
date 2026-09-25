@@ -240,6 +240,15 @@ El botón «Charlar» abre un campo de hasta 160 caracteres. Enter o Enviar publ
 
 ## Ampliación de la casa y gráficos
 
-«Menú → Mi casa» permite a la administración agregar ambientes, ponerles nombre, renombrarlos y eliminar los que no tengan tareas. Hay cuatro tipos (cocina, baño, dormitorio y living) y un máximo de doce ambientes. La casa se distribuye automáticamente en dos columnas con pasillo central. Las tareas y la presencia apuntan a cada ambiente concreto, por lo que dos baños tienen pendientes independientes.
+«Menú → Mi casa» permite a la administración agregar ambientes, ponerles nombre, renombrarlos y eliminar los que no tengan tareas. Hay seis tipos (cocina, baño, dormitorio, living, garaje y jardín) y un máximo de doce ambientes. La casa se distribuye automáticamente en dos columnas con pasillo central. Las tareas y la presencia apuntan a cada ambiente concreto, por lo que dos baños tienen pendientes independientes.
 
 La escena incorpora pisos con textura, paredes recortadas, aberturas, cortinas, zócalos y muebles detallados. Madera, textiles, cerámicos, piedra, metal y vidrio tienen respuestas diferentes a la luz. Iluminación y mapas de materiales se generan localmente; no se requieren descargas de modelos externos. La vista simple y el flujo de tareas siguen disponibles.
+
+
+### Mascotas y tareas de cuidado
+
+Desde «Menú → Mascotas» se pueden crear hasta seis perros o gatos y editar su nombre y pelaje. Pasean por la casa, descansan y muestran su nombre con un contador de pendientes. Un clic abre sus tareas; se puede crear una tarea desde esa vista o elegir la mascota al cargar una tarea general. En movimiento reducido permanecen quietas.
+
+Cada tarea de mascota conserva ambiente, recurrencia, puntos y cuidadores: una persona o una rotación de integrantes. Solo el cuidador del turno puede registrar que se realizó, y recibe los puntos. La tarea se ve tanto en la habitación como en la ficha de la mascota; completarla reduce su contador. El historial incluye su nombre. Las mascotas no realizan automáticamente tareas ni reciben puntos de personas. Los recordatorios se dirigen al cuidador.
+
+Las mascotas y sus tareas se comparten en tiempo real dentro de la casa. Cualquier integrante puede agregarlas o personalizarlas; solo la administración puede quitar las que no tienen tareas asociadas.

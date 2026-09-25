@@ -1,5 +1,6 @@
 import { Box, Plant } from './HouseFurnishings'
 import { Surface } from './HouseMaterials'
+import { GardenGround, GarageShell } from './OutdoorRooms'
 import { houseBounds, type HouseRoom } from '../../../shared/rooms'
 
 function Window({p}:{p:[number,number,number]}) {
@@ -15,6 +16,8 @@ function Window({p}:{p:[number,number,number]}) {
 }
 export function RoomArchitecture({room,index}:{room:HouseRoom;index:number}) {
   const back=index<2, left=index%2===0
+  if(room.kind==='garden')return <GardenGround left={left} />
+  if(room.kind==='garage')return <GarageShell left={left} />
   const wood=room.kind==='bedroom'||room.kind==='living'
   return <>
     <Box p={[0,.015,0]} s={[6,.12,6]} finish={wood?'wood':'tile'} color={wood?'#c5a886':room.kind==='bathroom'?'#d6d9d2':'#d4cabc'} radius={.005} />

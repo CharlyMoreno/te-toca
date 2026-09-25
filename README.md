@@ -9,7 +9,7 @@ El jugador recorre una pequeña casa 3D con su avatar. En cada habitación encue
 La definición de pantallas, flujos y reglas de uso está en [la especificación funcional del MVP](docs/MVP_FUNCIONAL.md).
 El [modelo de datos](docs/DB_MODEL.md) documenta las migraciones de acceso, hogares, tareas y turnos.
 
-Estado: acceso, hogares, casa 3D, presencia en tiempo real, editor de avatares, ampliación de ambientes, tareas recurrentes, turnos automáticos, finalización, deshacer e historial implementados. Los intercambios y la edición de rutinas siguen pendientes; el MVP completo todavía está en desarrollo. Te Toca es el nombre propuesto; su disponibilidad comercial y de dominio no fue verificada.
+Estado: acceso, hogares, casa 3D, presencia en tiempo real, editor de avatares, ampliación de ambientes, mascotas con tareas, tareas recurrentes, turnos automáticos, finalización, deshacer e historial implementados. Los intercambios y la edición de rutinas siguen pendientes; el MVP completo todavía está en desarrollo. Te Toca es el nombre propuesto; su disponibilidad comercial y de dominio no fue verificada.
 
 ## Problema
 
@@ -54,7 +54,7 @@ Un hogar puede registrar sus integrantes, configurar tareas recurrentes y recorr
 
 ### Inicio: nuestra casa
 
-- Casa 3D con cuatro ambientes iniciales y hasta doce personalizables: cocinas, baños, dormitorios y livings con nombres propios.
+- Casa 3D con cuatro ambientes iniciales y hasta doce personalizables: cocinas, baños, dormitorios, livings, garajes y jardines con nombres propios.
 - Avatar del jugador que se desplaza hacia la habitación elegida y realiza animaciones breves al completar sus tareas.
 - Avatares 3D de los integrantes activos en la vista general, con nombre y estado: hechas hoy, pendientes hoy y atrasadas.
 - Al tocar un avatar, se ven sus tareas y se resaltan las habitaciones donde tiene pendientes.
@@ -238,7 +238,7 @@ El entorno local usa una base D1 simulada. Para desplegar, se debe crear la base
 
 ## Casa y ambientes
 
-Desde **Menú → Mi casa**, quien administra puede agregar ambientes de cuatro tipos: cocina, baño, dormitorio y living. Cada ambiente tiene nombre propio, muebles según su tipo, tareas independientes y ubicación dentro del recorrido. Se pueden tener varios baños o dormitorios, hasta un máximo de doce ambientes por casa.
+Desde **Menú → Mi casa**, quien administra puede agregar ambientes de seis tipos: cocina, baño, dormitorio, living, garaje y jardín. Cada ambiente tiene nombre propio, muebles según su tipo, tareas independientes y ubicación dentro del recorrido. Se pueden tener varios baños o dormitorios, hasta un máximo de doce ambientes por casa.
 
 - **Agregar:** elegir tipo y nombre; la casa amplía su distribución automáticamente.
 - **Renombrar:** cambia el nombre sin afectar tareas, puntajes ni historial.
@@ -253,7 +253,7 @@ La escena ahora usa materiales con mapas procedurales de madera, piedra, tela, r
 
 Se incorporaron zócalos, aberturas y cortinas; cocina con mesada, bacha, grifería, horno y banquetas; baño con mampara, ducha, vanitory y espejo estilizado; dormitorio con placard, cabecera tapizada y lámparas; living con textiles, mesa, biblioteca baja y TV. La casa se presenta como una maqueta arquitectónica abierta, con algunas paredes recortadas para mantener visibles tareas y personajes.
 
-Aplicar `npm run db:migrate:local` incorpora `0006_rooms.sql`. Las casas existentes conservan sus cuatro ambientes y sus tareas mediante una migración de referencias. Las nuevas casas reciben la misma distribución inicial.
+Aplicar `npm run db:migrate:local` incorpora las migraciones pendientes, incluyendo `0006_rooms.sql` y `0007_garden_garage_pets.sql`. Las casas existentes conservan sus cuatro ambientes y sus tareas mediante una migración de referencias. Las nuevas casas reciben la misma distribución inicial.
 
 ## Tareas compartidas, puntos y retos
 
@@ -359,3 +359,13 @@ También evaluar si los objetos de la casa ayudan a encontrar pendientes y si la
 6. Reacciones visuales de las habitaciones, accesibilidad y ajustes de uso en móvil.
 
 El MVP estará completo cuando un hogar pueda coordinar sus tareas de principio a fin y se cumplan los criterios de aceptación anteriores.
+
+
+## Garaje, jardín y mascotas
+
+- **Menú → Mi casa:** la administración puede agregar un garaje con portón, auto y banco de herramientas, o un jardín abierto con césped, árbol, cantero, banco y sendero. Conservan el límite compartido de doce ambientes y admiten tareas como cualquier habitación. Las casas siguen comenzando con cuatro ambientes; las ampliaciones se agregan desde el editor.
+- **Menú → Mascotas:** cualquier integrante puede agregar y personalizar hasta seis perros o gatos, eligiendo nombre, especie y pelaje. Quien administra puede quitar una mascota si nunca tuvo tareas asociadas; las rutinas pausadas también conservan esa referencia.
+- Las mascotas recorren las puertas y el corredor, hacen pausas y animan patas, cabeza y cola. Tocarlas abre su lista de tareas; la vista simple ofrece el mismo acceso desde el menú. Con movimiento reducido permanecen quietas.
+- **Crear tarea → Asignar a una mascota:** asocia la tarea a su ficha y a un ambiente. Se elige una persona responsable o varias para rotar sus cuidados. Ejemplos: dar de comer, pasear o practicar un truco. El responsable confirma la finalización y recibe los puntos; la mascota nunca completa tareas automáticamente. Deshacer, historial y recordatorios siguen funcionando.
+- Altas, personalización y tareas se actualizan por el socket privado del hogar. El paseo se calcula localmente con un recorrido determinista y el reloj de cada dispositivo; no transmite posiciones ni representa movimiento de animales reales. Relojes desajustados pueden mostrar posiciones diferentes.
+- `0007_garden_garage_pets.sql` agrega tipos de ambiente, mascotas y la asociación opcional en tareas, conservando las referencias y el historial existentes. Ejecutar `npm run db:migrate:local` antes de levantar esta versión; para un despliegue con D1 remota, aplicar también las migraciones allí.

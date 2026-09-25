@@ -100,7 +100,7 @@ function Living() {
     <Tube p={[1.94,.83,-2.4]} r={.02} h={1.55} color="#b9a06c" /><Lamp p={[1.94,1.36,-2.4]} />
   </>
 }
-export function Furnishings({kind}:{kind:RoomKind}) {
+export function Furnishings({kind}:{kind:Exclude<RoomKind,'garage'|'garden'>}) {
   const Component={kitchen:Kitchen,bathroom:Bathroom,bedroom:Bedroom,living:Living}[kind]
   return <Component />
 }

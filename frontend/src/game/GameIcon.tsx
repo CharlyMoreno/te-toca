@@ -1,6 +1,9 @@
 import type { CSSProperties } from 'react'
-export type IconName = 'chat'|'home'|'kitchen'|'bathroom'|'bedroom'|'living'|'tasks'|'plus'|'menu'|'trophy'|'people'|'avatar'|'history'|'view'|'exit'|'settings'
+export type IconName = 'chat'|'home'|'kitchen'|'bathroom'|'bedroom'|'living'|'garage'|'garden'|'pets'|'tasks'|'plus'|'menu'|'trophy'|'people'|'avatar'|'history'|'view'|'exit'|'settings'
 const paths: Record<IconName, string> = {
+  garage: 'M3 21V8l9-5 9 5v13M6 21V11h12v10M6 15h12M6 18h12M2 21h20',
+  garden: 'M12 21V10M12 15C4 16 3 10 3 7c7 0 9 3 9 8Zm0-4C12 5 16 3 21 3c0 6-3 9-9 8ZM6 21h12',
+  pets: 'M12 11c-2 0-3 3-5 5-3 4 1 6 5 4 4 2 8 0 5-4-2-2-3-5-5-5ZM6 7a2 3 0 1 0 0 .1ZM10 4a1.5 2 0 1 0 0 .1ZM15 4a1.5 2 0 1 0 0 .1ZM19 7a2 3 0 1 0 0 .1Z',
   chat: 'M5 3h14a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H9l-6 4V5a2 2 0 0 1 2-2ZM7 8h10M7 12h7',
   home: 'm3 10 9-7 9 7M5 9v12h14V9M9 21v-8h6v8',
   kitchen: 'M5 3v6a3 3 0 0 0 6 0V3M8 3v18M18 3c-3 3-3 8 0 9h2V3h-2Zm2 9v9',

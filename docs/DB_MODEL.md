@@ -80,3 +80,12 @@ La distribución visual se calcula en `shared/rooms.ts`: dos columnas y un corre
 ## Pendiente
 
 `task_swaps` todavía no tiene migración ni endpoints. Se incorporará con el flujo de propuestas y aceptación atómica de intercambios. También falta la edición de rutinas y su reactivación. El valor `swapped` del historial está reservado para esa implementación.
+
+
+## Garaje, jardín y mascotas
+
+`0007_garden_garage_pets.sql` agrega `rooms.room_type` con seis tipos visibles y copia el tipo de cada ambiente existente. `rooms.kind` y `tasks.room` conservan los cuatro valores históricos para mantener sus CHECK y claves foráneas sin reconstruir tablas padre: garaje y jardín usan `living` en esos campos de compatibilidad. La API de ambientes expone `room_type` como `kind`; las tareas y la presencia siguen usando el identificador del ambiente.
+
+`pets` guarda ID, hogar, nombre (1–24 caracteres), especie (`dog`/`cat`), color del catálogo y fecha de creación. Un INSERT condicional limita a seis mascotas por casa de forma atómica. Todos los integrantes pueden crear y personalizar mascotas de su propio hogar; eliminarlas requiere administración y ninguna tarea referenciada.
+
+`tasks.pet_id` es una FK opcional, indexada, con triggers que exigen que la mascota pertenezca al hogar de la tarea. La asociación permanece fija durante la rutina y se devuelve en ocurrencias, rutinas e historial. `task_participants`, `assignee` y `completed_by` siguen siendo personas: representan cuidadores, conservan la rotación y reciben los puntos. Las mascotas no son usuarios ni tienen credenciales o presencia autenticada. Los cambios invalidan la vista del hogar mediante el socket existente; la animación del recorrido se calcula en el cliente.

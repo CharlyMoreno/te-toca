@@ -1,4 +1,5 @@
 import { roomsApi } from './rooms'
+import { petsApi } from './pets'
 import { Hono } from 'hono'
 import { profile } from './profile'
 import { presence, notifyHouse } from './presence'
@@ -37,6 +38,7 @@ app.route('/api/auth', auth)
 app.route('/api/homes', homes)
 app.route('/api/tasks', tasks)
 app.route('/api/rooms', roomsApi)
+app.route('/api/pets', petsApi)
 app.notFound((c) => c.json({ error: 'Ruta no encontrada.' }, 404))
 app.onError((error, c) => {
   console.error('API error', error)

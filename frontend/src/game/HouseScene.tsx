@@ -1,6 +1,9 @@
 import { houseBounds, type HouseRoom } from '../../../shared/rooms'
 import { HouseMaterials } from './HouseMaterials'
 import { Furnishings } from './HouseFurnishings'
+import { Garage, Garden } from './OutdoorRooms'
+import PetActor from './PetActor'
+import type { Pet } from '../../../shared/pets'
 import { HouseFoundation, RoomArchitecture } from './HouseArchitecture'
 import type { ChatMessage } from '../../../shared/chat'
 import type { EmoteEvent } from '../../../shared/emotes'
@@ -17,7 +20,7 @@ import { type Occurrence, type Person, type RoomId } from './model'
 
 type V3 = [number, number, number]
 type Props = {
-  rooms:HouseRoom[]; speech: ChatMessage[]; reactions: EmoteEvent[]; character: string|null; event: GameEvent | null; panelOpen: boolean; room: RoomId | null; online: OnlinePerson[]; people: Person[]; self: string; tasks: Occurrence[]; today: string;
+  pets:Pet[]; onPet:(id:string)=>void; rooms:HouseRoom[]; speech: ChatMessage[]; reactions: EmoteEvent[]; character: string|null; event: GameEvent | null; panelOpen: boolean; room: RoomId | null; online: OnlinePerson[]; people: Person[]; self: string; tasks: Occurrence[]; today: string;
   cameraRevision: number; focus: string | null; celebration: string | null; reduced: boolean;
   onRoom: (room: RoomId | null) => void; onTask: (task: Occurrence) => void; onPerson: (id: string) => void
 }
@@ -115,11 +118,12 @@ function TaskProp({ task, index, active, celebrate, reduced, onClick }: { task: 
   return <group position={[-1.6+(index%3)*1.4,.14,2.05-Math.floor(index/3)*.65]} ref={group} scale={baseScale} onClick={e=>{e.stopPropagation();onClick()}}>
     {!reduced&&task.completed_at&&celebrate&&<group ref={effect}>{Array.from({length:9},(_,i)=><mesh key={i}><sphereGeometry args={[task.icon==='dishes'?.075:.045,8,6]} /><meshStandardMaterial color={task.icon==='dishes'?'#b9f1f4':'#ffdfa3'} transparent opacity={.8} /></mesh>)}</group>}
     <Cylinder p={[0,.04,0]} radius={.35} height={.05} color="#fff4dd" />
-    {task.icon==='trash' ? <><mesh position={[0,.35,0]} castShadow><sphereGeometry args={[.25,10,8]} /><meshStandardMaterial color="#667e74" /></mesh><Block p={[0,.58,0]} s={[.13,.13,.13]} color="#667e74" /></>
+    {task.pet_id&&task.icon==='dishes' ? <><mesh position={[0,.2,0]} castShadow><cylinderGeometry args={[.27,.2,.19,24,1,true]} /><meshStandardMaterial color="#d0ab79" side={THREE.DoubleSide} /></mesh><Cylinder p={[0,.17,0]} radius={.21} height={.04} color="#88b9bd" /></>
+      : task.icon==='trash' ? <><mesh position={[0,.35,0]} castShadow><sphereGeometry args={[.25,10,8]} /><meshStandardMaterial color="#667e74" /></mesh><Block p={[0,.58,0]} s={[.13,.13,.13]} color="#667e74" /></>
       : task.icon==='dishes' ? <>{[0,1,2].map(n=><Cylinder key={n} p={[0,.12+n*.06,0]} radius={.27} height={.045} color={n%2?'#c9dde1':'#fbf6eb'} />)}<Cylinder p={[.12,.42,0]} radius={.09} height={.27} color="#eeb991" /></>
       : task.icon==='laundry' ? <><Block p={[0,.25,0]} s={[.55,.38,.42]} color="#cbb49b" /><Block p={[-.07,.49,0]} s={[.4,.12,.35]} color="#c3b1dd" /><Block p={[.05,.59,.04]} s={[.32,.08,.24]} color="#f0a98d" /></>
       : <><Cylinder p={[0,.47,0]} radius={.035} height={.8} color="#ad866a" /><Block p={[0,.12,0]} s={[.5,.17,.2]} color="#e5b774" /></>}
-    {!task.completed_at && <Html zIndexRange={[20, 0]} center position={[0,active ? 1.13 : .95,0]}><button className="task-pin" onClick={onClick} title={task.title} aria-label={task.title}><span>!</span></button></Html>}
+    {!task.completed_at && <Html zIndexRange={[20, 0]} center position={[0,active ? 1.13 : .95,0]}><button className="task-pin" onClick={onClick} title={task.title} aria-label={task.title}><span>{task.pet_id?'🐾':'!'}</span></button></Html>}
   </group>
 }
 function ViewCamera({ rooms, room, reduced, panelOpen }: Pick<Props,'rooms'|'room'|'reduced'|'panelOpen'>) {
@@ -162,18 +166,19 @@ export default function HouseScene(props: Props) {
     <ContactShadows key={depth} position={[0,-.475,0]} opacity={.3} scale={[20,depth+8]} blur={2.4} far={8} resolution={512} frames={1} color="#544535" />
     {props.rooms.map((room,index)=>{
       const [x,z]=room.position
-      const visible=props.tasks.filter(t=>t.room===room.id && t.due_date<=props.today && (!props.focus || props.focus===t.assignee))
+      const visible=props.tasks.filter(t=>t.room===room.id && t.due_date<=props.today && (!props.focus || props.focus===t.assignee || props.focus===t.pet_id))
       const pending=visible.filter(t=>!t.completed_at)
       const objects=visible.filter(t=>!t.completed_at||t.id===props.celebration).slice(0,6)
       return <group key={room.id} position={[x,0,z]} onClick={e=>{e.stopPropagation();props.onRoom(room.id)}}>
         <RoomArchitecture room={room} index={index} />
-        <Furnishings kind={room.kind} />
+        {room.kind==='garage'?<Garage />:room.kind==='garden'?<Garden />:<Furnishings kind={room.kind} />}
         <RoomBeacon color={room.color} active={props.room===room.id||props.event?.room===room.id} reduced={props.reduced} />
         <Html zIndexRange={[20, 0]} center position={[0,.15,2.72]}><button className={`room-tag ${props.room===room.id?'selected':''}`} onClick={()=>props.onRoom(room.id)}><i style={{background:room.color}} />{room.name}<b>{pending.length || '✓'}</b></button></Html>
         {pending.length > 6 && <Html zIndexRange={[20, 0]} center position={[0,.8,2.8]}><button className="room-tag" onClick={()=>props.onRoom(room.id)}>+{pending.length - 6} en la lista</button></Html>}
         {objects.map((task,i)=><TaskProp key={task.id} task={task} index={i} active={props.room===room.id} celebrate={props.celebration===task.id} reduced={props.reduced} onClick={()=>props.onTask(task)} />)}
       </group>
     })}
+    {props.pets.map(pet=><PetActor key={pet.id} pet={pet} rooms={props.rooms} reduced={props.reduced} selected={props.focus===pet.id} pending={props.tasks.filter(task=>task.pet_id===pet.id&&!task.completed_at&&task.due_date<=props.today).length} onClick={()=>props.onPet(pet.id)} />)}
     {props.people.map((person,index)=> (person.id===props.self || props.online.some(p=>p.userId===person.id) || (props.event?.kind==='task.nudged'&&props.event.targetId===person.id)) && <Avatar rooms={props.rooms} entranceZ={entranceZ} key={person.id} person={person} index={index} room={person.id===props.self ? props.room : props.online.find(p=>p.userId===person.id)?.room ?? (props.event?.targetId===person.id?props.event.room:null)} presenceLabel={props.online.some(p=>p.userId===person.id) ? (props.online.find(p=>p.userId===person.id)?.active ? '● En línea' : '◐ Ausente') : props.event?.targetId===person.id?'Desconectado · aviso guardado':'Sin conexión'} own={person.id===props.self} reduced={props.reduced}
       reaction={props.event?.targetId===person.id&&['task.completed','task.nudged'].includes(props.event.kind)?props.event:null} pending={props.tasks.filter(t=>!t.completed_at && t.due_date<=props.today && t.assignee===person.id).length}
       completed={props.tasks.filter(t=>t.completed_at && t.due_date===props.today && t.assignee===person.id).length}

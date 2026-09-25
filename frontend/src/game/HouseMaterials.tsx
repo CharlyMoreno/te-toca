@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react'
 import * as THREE from 'three'
 
-export type Finish='wood'|'tile'|'stone'|'fabric'|'plaster'|'metal'|'ceramic'|'glass'
+export type Finish='wood'|'tile'|'stone'|'fabric'|'plaster'|'metal'|'ceramic'|'glass'|'grass'|'concrete'
 type Maps=Partial<Record<Finish,THREE.CanvasTexture>>
 const Materials=createContext<Maps>({})
 // Procedural, deterministic maps: no external assets or downloads.
@@ -28,6 +28,13 @@ function texture(kind:Finish):THREE.CanvasTexture {
       const v=207+Math.floor(rand()*14);ctx.fillStyle=`rgb(${v},${v},${v-3})`;ctx.fillRect(x*128+2,y*128+2,124,124)
       ctx.strokeStyle='#f4f3ec';ctx.strokeRect(x*128+3,y*128+3,122,122)
     }
+  } else if(kind==='grass') {
+    ctx.fillStyle='#b4bca1';ctx.fillRect(0,0,512,512)
+    for(let i=0;i<18000;i++) {
+      const x=rand()*512,y=rand()*512,v=100+Math.floor(rand()*130)
+      ctx.strokeStyle=`rgb(${v},${Math.min(255,v+12)},${v-20})`;ctx.lineWidth=.6+rand()
+      ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-2+rand()*4,y-2-rand()*7);ctx.stroke()
+    }
   } else if(kind==='fabric') {
     ctx.fillStyle='#dbd7cd';ctx.fillRect(0,0,512,512)
     for(let i=0;i<512;i+=3){ctx.fillStyle=i%2?'#b5b0a4':'#edeae1';ctx.globalAlpha=.3;ctx.fillRect(i,0,1,512);ctx.fillRect(0,i,512,1)}ctx.globalAlpha=1
@@ -42,7 +49,7 @@ function texture(kind:Finish):THREE.CanvasTexture {
   return map
 }
 export function HouseMaterials({children}:{children:ReactNode}) {
-  const maps=useMemo(()=>Object.fromEntries(['wood','tile','stone','fabric','plaster'].map(kind=>[kind,texture(kind as Finish)])) as Maps,[])
+  const maps=useMemo(()=>Object.fromEntries(['wood','tile','stone','fabric','plaster','grass','concrete'].map(kind=>[kind,texture(kind as Finish)])) as Maps,[])
   useEffect(()=>()=>Object.values(maps).forEach(map=>map?.dispose()),[maps])
   return <Materials.Provider value={maps}>{children}</Materials.Provider>
 }
