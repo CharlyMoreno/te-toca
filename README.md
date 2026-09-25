@@ -199,6 +199,14 @@ El navegador no accede directamente a D1. El Worker comprueba la identidad, la p
 
 Este stack es una propuesta de implementación, no una lista de dependencias ya instaladas.
 
+## Despliegue en Cloudflare
+
+La propuesta es publicar el cliente con Workers Static Assets y la API Hono en el mismo Worker, con Cloudflare D1 para persistencia y entornos separados de pruebas y producción. El envío de enlaces de acceso requiere un proveedor de correo por elegir. R2 queda como componente opcional.
+
+El análisis, las decisiones de arquitectura, el plan de publicación y la recuperación están documentados en [la propuesta de infraestructura](docs/INFRAESTRUCTURA.md). La infraestructura todavía no está provisionada.
+
+Las credenciales se configuran localmente en `.env.local`, excluido de Git, o mediante secretos del entorno de despliegue. `.env.example` documenta únicamente los nombres de las variables, sin valores. Nunca incluir secretos en el frontend ni usar el prefijo `VITE_` para ellos.
+
 ## Fuera del MVP
 
 - Varios hogares por usuario.

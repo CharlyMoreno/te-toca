@@ -1,2 +1,7 @@
 .env
 tmp/
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+.wrangler/
