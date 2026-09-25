@@ -8,9 +8,8 @@ import type { AppEnv } from './types'
 type Connection = {
   userId: string; homeId: string; sessionHash: string;
   room: string | null; active: boolean; movedAt: number; seenAt: number;
-  windowStart: number; messages: number; lastEmoteAt?: number; lastChatAt?: number;
+  windowStart: number; messages: number; lastEmoteAt?: number; lastChatAt?: number; moveToken?: string;
 }
-const roomIds = ['kitchen', 'bathroom', 'bedroom', 'living']
 const timeout = 70_000
 
 // One object per household; all identity headers are supplied by our authenticated Worker.
@@ -119,15 +118,20 @@ export class HousePresence implements DurableObject {
       return
     }
     if (event.type === 'move') {
-      if ((event.room !== null && !roomIds.includes(event.room as string)) || typeof event.active !== 'boolean') {
+      if ((event.room !== null && (typeof event.room!=='string'||event.room.length>80)) || typeof event.active !== 'boolean') {
         ws.close(1008, 'Invalid room'); this.snapshot(ws); return
       }
-      data.room = event.room as string | null; data.active = event.active; data.movedAt = timestamp
+      const token=crypto.randomUUID()
+      data.moveToken=token;data.seenAt=timestamp;ws.serializeAttachment(data)
+      const allowed=event.room===null || Boolean(await this.env.DB.prepare('SELECT 1 FROM rooms WHERE id=? AND home_id=?').bind(event.room,data.homeId).first())
+      const latest=this.data(ws)
+      if(latest.moveToken!==token||ws.readyState!==1)return
+      latest.room=allowed?event.room as string|null:null;latest.active=event.active;latest.movedAt=timestamp
+      ws.serializeAttachment(latest);this.snapshot();return
     }
     data.seenAt = timestamp
     ws.serializeAttachment(data)
-    if (event.type === 'move') this.snapshot()
-    else ws.send(JSON.stringify({ type: 'pong' }))
+    ws.send(JSON.stringify({ type: 'pong' }))
   }
   webSocketClose(ws: WebSocket, code: number) {
     try { ws.close(code === 1006 ? 1000 : code, 'Disconnected') } catch { /* Already closed. */ }

@@ -6,7 +6,7 @@ export type GameEvent = {
   targetId: string
   occurrenceId: string
   title: string
-  room: 'kitchen' | 'bathroom' | 'bedroom' | 'living'
+  room: string
   points: number
   createdAt: number
 }

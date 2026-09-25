@@ -1,9 +1,11 @@
+import { layoutRooms, type HouseRoom, type RoomRecord } from '../../../shared/rooms'
+import RoomEditor from './RoomEditor'
 import { chatBubbleDuration, type ChatMessage } from '../../../shared/chat'
 import HouseChat from './HouseChat'
 import { emotes, type Emote, type EmoteEvent } from '../../../shared/emotes'
 import type { GameEvent, Score } from '../../../shared/game'
 import { Component, lazy, Suspense, useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
-import { colors, request, rooms, type House, type Occurrence, type Person, type RoomId, type Routine } from './model'
+import { colors, request, type House, type Occurrence, type Person, type RoomId, type Routine } from './model'
 import './game.css'
 import './hud.css'
 import GameIcon from './GameIcon'
@@ -41,6 +43,7 @@ export default function GameHouse({ home, user, members: initialMembers, onLogou
   const [speech,setSpeech]=useState<(ChatMessage&{expiresAt:number})[]>([])
   const [character,setCharacter]=useState<string|null>(null)
   const [reactions,setReactions]=useState<(EmoteEvent&{expiresAt:number})[]>([])
+  const [rooms,setRooms]=useState<HouseRoom[]>([])
   const [members,setMembers]=useState(initialMembers)
   const [tasks,setTasks]=useState<Occurrence[]>([])
   const [routines,setRoutines]=useState<Routine[]>([])
@@ -57,14 +60,14 @@ export default function GameHouse({ home, user, members: initialMembers, onLogou
   const [focus,setFocus]=useState<string|null>(null)
   const [selected,setSelected]=useState<string|null>(null)
   const [tab,setTab]=useState<'pending'|'done'|'upcoming'>('pending')
-  const [dialog,setDialog]=useState<'task'|'invite'|'history'|'routines'|'avatar'|'scores'|'menu'|null>(null)
+  const [dialog,setDialog]=useState<'task'|'invite'|'history'|'routines'|'avatar'|'scores'|'menu'|'rooms'|null>(null)
   const [celebration,setCelebration]=useState<string|null>(null)
   const [undo,setUndo]=useState<{id:string;title:string}|null>(null)
   const [cameraRevision,setCameraRevision]=useState(0)
   const [flat,setFlat]=useState(false)
   const [reduced,setReduced]=useState(()=>window.matchMedia('(prefers-reduced-motion: reduce)').matches)
   const [title,setTitle]=useState('')
-  const [taskRoom,setTaskRoom]=useState<RoomId>('kitchen')
+  const [taskRoom,setTaskRoom]=useState<RoomId>('')
   const [icon,setIcon]=useState('dishes')
   const [frequency,setFrequency]=useState('daily')
   const [firstDate,setFirstDate]=useState('')
@@ -84,8 +87,12 @@ export default function GameHouse({ home, user, members: initialMembers, onLogou
   const refreshVersion=useRef(0)
   const refresh=useCallback(async()=>{
     const version=++refreshVersion.current
-    const [data,house]=await Promise.all([request<{occurrences:Occurrence[];routines:Routine[];scores:Score[];today:string}>('/tasks'),request<{members:Person[]}>('/homes/current')])
+    const [data,house,layout]=await Promise.all([request<{occurrences:Occurrence[];routines:Routine[];scores:Score[];today:string}>('/tasks'),request<{members:Person[]}>('/homes/current'),request<{rooms:RoomRecord[]}>('/rooms')])
     if(version!==refreshVersion.current)return
+    const updatedRooms=layoutRooms(layout.rooms)
+    setRooms(updatedRooms)
+    setRoom(previous=>updatedRooms.some(room=>room.id===previous)?previous:null)
+    setTaskRoom(previous=>updatedRooms.some(room=>room.id===previous)?previous:updatedRooms[0]?.id??'')
     setMembers(house.members)
     setScores(data.scores);setTasks(data.occurrences);setRoutines(data.routines);setToday(data.today)
   },[])
@@ -141,7 +148,8 @@ export default function GameHouse({ home, user, members: initialMembers, onLogou
   }
   function chooseRoom(id:RoomId|null){setCharacter(null);setRoom(id);setSelected(null);setTab('pending')}
   function chooseTask(task:Occurrence){setPanelOpen(true);setRoom(task.room);setSelected(task.id);setTab(task.completed_at?'done':task.due_date>today?'upcoming':'pending')}
-  function newTask(id:RoomId=room??'kitchen') {
+  function newTask(id:RoomId=room??rooms[0]?.id) {
+    if(!id||!rooms.some(room=>room.id===id)){setError('Todavía estamos cargando los ambientes.');return}
     setTaskRoom(id);setIcon(rooms.find(r=>r.id===id)!.icon);setTitle(rooms.find(r=>r.id===id)!.suggestion);setFirstDate(today);setFrequency('daily');setPoints(10);setParticipants(members.map(p=>p.id));setDialog('task')
   }
   function createTask(event:FormEvent) {
@@ -186,10 +194,10 @@ export default function GameHouse({ home, user, members: initialMembers, onLogou
     </header>
     <main className={`game-layout immersive ${panelOpen?'panel-open':'panel-closed'}`}>
       <section className="world-column" aria-label="Casa interactiva">
-        <nav className="room-navigation" aria-label="Ir a una habitación"><button className={!room?'active':''} aria-pressed={!room} onClick={()=>{chooseRoom(null);setCameraRevision(value=>value+1)}}><GameIcon name="home" /><span>Casa</span></button>{rooms.map(r=><button key={r.id} className={room===r.id?'active':''} aria-pressed={room===r.id} onClick={()=>chooseRoom(r.id)}><GameIcon name={r.id} /><span>{r.name}</span></button>)}</nav>
+        <nav className="room-navigation" aria-label="Ir a una habitación"><button className={!room?'active':''} aria-pressed={!room} onClick={()=>{chooseRoom(null);setCameraRevision(value=>value+1)}}><GameIcon name="home" /><span>Casa</span></button>{rooms.map(r=><button key={r.id} className={room===r.id?'active':''} aria-pressed={room===r.id} onClick={()=>chooseRoom(r.id)}><GameIcon name={r.kind} /><span>{r.name}</span></button>)}</nav>
         <div className="world-canvas">
           {flat?<div className="room-grid">{rooms.map(r=><button key={r.id} style={{borderColor:r.color}} onClick={()=>chooseRoom(r.id)}><span>{r.name}</span><strong>{tasks.filter(t=>t.room===r.id&&!t.completed_at&&t.due_date<=today).length}</strong><small>tareas pendientes</small></button>)}</div>:
-            <SceneBoundary><Suspense fallback={<div className="scene-fallback">Abriendo las puertas de tu casa…</div>}><HouseScene speech={speech} reactions={reactions} character={character} event={gameEvent} panelOpen={panelOpen} online={presence.people} cameraRevision={cameraRevision} room={room} people={members} self={user.id} tasks={tasks} today={today} focus={focus} celebration={celebration} reduced={reduced} onRoom={chooseRoom} onTask={chooseTask} onPerson={id=>setCharacter(character===id?null:id)} /></Suspense></SceneBoundary>}
+            <SceneBoundary><Suspense fallback={<div className="scene-fallback">Abriendo las puertas de tu casa…</div>}><HouseScene rooms={rooms} speech={speech} reactions={reactions} character={character} event={gameEvent} panelOpen={panelOpen} online={presence.people} cameraRevision={cameraRevision} room={room} people={members} self={user.id} tasks={tasks} today={today} focus={focus} celebration={celebration} reduced={reduced} onRoom={chooseRoom} onTask={chooseTask} onPerson={id=>setCharacter(character===id?null:id)} /></Suspense></SceneBoundary>}
           <div className="scene-toolbar"><button className="scene-add" aria-label="Crear tarea" onClick={()=>newTask()}><GameIcon name="plus" /><span>Crear tarea</span></button><button aria-label={panelOpen?'Cerrar tareas':'Ver tareas'} onClick={()=>setPanelOpen(value=>!value)} aria-expanded={panelOpen} aria-controls="house-tasks"><GameIcon name="tasks" /><span>Tareas</span>{ownPending>0&&<b>{ownPending}</b>}</button></div>
           {loading&&<div className="scene-loading">Cargando tareas…</div>}
         </div>
@@ -211,7 +219,8 @@ export default function GameHouse({ home, user, members: initialMembers, onLogou
     {gameEvent&&<div className={`live-event ${gameEvent.kind.replace('.','-')}`} role="status"><span>{gameEvent.kind==='task.created'?'✦':gameEvent.kind==='task.nudged'?'📣':gameEvent.kind==='task.completed'?'★':'↶'}</span><div><strong>{gameEvent.kind==='task.created'?`${gameEvent.actorName} agregó una tarea`:gameEvent.kind==='task.nudged'?`${gameEvent.actorName}: ¡${name(gameEvent.targetId)}, te toca!`:gameEvent.kind==='task.completed'?`${gameEvent.actorName} sumó ${gameEvent.points} puntos`:`${gameEvent.actorName} deshizo una tarea`}</strong><small>{gameEvent.title}</small></div><button onClick={()=>{setFocus(null);setRoom(gameEvent.room);setPanelOpen(true);setSelected(gameEvent.occurrenceId);setTab(gameEvent.kind==='task.completed'?'done':(tasks.find(t=>t.id===gameEvent.occurrenceId)?.due_date??today)>today?'upcoming':'pending')}}>Ver</button></div>}
     <HouseChat messages={messages} people={members} self={user.id} status={presence.status} send={presence.sendChat} />
     {character&&<div className="emote-picker" role="dialog" aria-label={`Acciones con ${name(character)}`}><header><strong>{name(character)}</strong><button aria-label="Cerrar reacciones" onClick={()=>setCharacter(null)}>×</button></header><div>{emotes.map(item=><button key={item.emoji} onClick={()=>react(item.emoji)} title={item.label} aria-label={item.label}><span>{item.emoji}</span><small>{item.label}</small></button>)}</div><footer><span>La reacción sale sobre tu personaje</span><button onClick={()=>{setFocus(character);setPanelOpen(true);setCharacter(null)}}>Ver tareas →</button></footer></div>}
-    {dialog==='menu'&&<Dialog title={home.name} close={close}><div className="menu-progress"><span>Hoy completamos</span><strong>{done} / {daily.length}</strong><progress value={done} max={daily.length||1} /></div><div className="game-menu"><button onClick={()=>setDialog('avatar')}><GameIcon name="avatar" />Mi personaje<span>→</span></button><button onClick={()=>setDialog('invite')}><GameIcon name="people" />Integrantes<span>{members.length}</span></button><button onClick={()=>setDialog('scores')}><GameIcon name="trophy" />Puntajes<span>→</span></button><button onClick={openHistory}><GameIcon name="history" />Historial<span>→</span></button>{home.role==='admin'&&<button onClick={()=>setDialog('routines')}><GameIcon name="settings" />Rutinas<span>→</span></button>}<button onClick={()=>{setFlat(value=>!value);close()}}><GameIcon name="view" />{flat?'Volver al 3D':'Usar vista simple'}<span>→</span></button><button onClick={onLogout}><GameIcon name="exit" />Salir<span>→</span></button></div><p className="menu-help">Tocá una habitación para entrar y un objeto para ver su tarea. Arrastrá para girar; usá la rueda o un pellizco para acercarte.</p></Dialog>}
+    {dialog==='rooms'&&<Dialog title="Diseñá tu casa" close={close}><RoomEditor rooms={rooms} changed={async id=>{await refresh();if(id){setRoom(id);setCameraRevision(value=>value+1)}}} /></Dialog>}
+    {dialog==='menu'&&<Dialog title={home.name} close={close}><div className="menu-progress"><span>Hoy completamos</span><strong>{done} / {daily.length}</strong><progress value={done} max={daily.length||1} /></div><div className="game-menu"><button onClick={()=>setDialog('avatar')}><GameIcon name="avatar" />Mi personaje<span>→</span></button><button onClick={()=>setDialog('invite')}><GameIcon name="people" />Integrantes<span>{members.length}</span></button><button onClick={()=>setDialog('scores')}><GameIcon name="trophy" />Puntajes<span>→</span></button><button onClick={openHistory}><GameIcon name="history" />Historial<span>→</span></button>{home.role==='admin'&&<button onClick={()=>setDialog('rooms')}><GameIcon name="home" />Mi casa<span>→</span></button>}{home.role==='admin'&&<button onClick={()=>setDialog('routines')}><GameIcon name="settings" />Rutinas<span>→</span></button>}<button onClick={()=>{setFlat(value=>!value);close()}}><GameIcon name="view" />{flat?'Volver al 3D':'Usar vista simple'}<span>→</span></button><button onClick={onLogout}><GameIcon name="exit" />Salir<span>→</span></button></div><p className="menu-help">Tocá una habitación para entrar y un objeto para ver su tarea. Arrastrá para girar; usá la rueda o un pellizco para acercarte.</p></Dialog>}
     {dialog==='scores'&&<Dialog title="Puntos de la casa" close={close}><p>★ {scores.reduce((total,score)=>total+score.points,0)} puntos entre todos. Cada tarea completada suma; deshacer revierte sus puntos.</p><div className="scoreboard">{scores.map((score,index)=><article key={score.userId}><span>{index===0&&score.points>0?'🏆':index+1}</span><div><strong>{name(score.userId)}{score.userId===user.id?' (vos)':''}</strong><small>{score.completed} tareas completadas</small></div><b>{score.points}<small>puntos</small></b></article>)}</div></Dialog>}
     {dialog==='avatar'&&<Dialog title="Tu personaje" close={close}><AvatarEditor initial={members.find(p=>p.id===user.id)?.avatar} saved={avatar=>{setMembers(previous=>previous.map(p=>p.id===user.id?{...p,avatar}:p));setDialog(null)}} /></Dialog>}
     {dialog==='task'&&<Dialog title="Una nueva tarea" close={close}><form onSubmit={createTask} className="task-form"><label>¿Qué hay que hacer?<input autoFocus required minLength={2} maxLength={80} value={title} onChange={e=>setTitle(e.target.value)} /></label><div className="form-columns"><label>Habitación<select value={taskRoom} onChange={e=>setTaskRoom(e.target.value as RoomId)}>{rooms.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></label><label>Se repite<select value={frequency} onChange={e=>setFrequency(e.target.value)}><option value="daily">Cada día</option><option value="weekly">Cada semana</option></select></label></div><label>Objeto en la habitación<select value={icon} onChange={e=>setIcon(e.target.value)}><option value="dishes">Platos</option><option value="trash">Bolsa de basura</option><option value="clean">Escoba</option><option value="laundry">Canasto de ropa</option></select></label><label>Puntos por completarla<input type="number" required min={5} max={100} step={1} value={points} onChange={e=>setPoints(Number(e.target.value))} /><small>De 5 a 100. Elegí el valor según el esfuerzo.</small></label><label>Primer turno<input type="date" required min={today} value={firstDate} onChange={e=>setFirstDate(e.target.value)} /></label><fieldset><legend>¿Entre quiénes rota?</legend><p>Elegí una persona para asignársela, o varias para rotar. El número indica el orden.</p>{members.map(person=><label className="participant-option" key={person.id}><input type="checkbox" checked={participants.includes(person.id)} onChange={()=>setParticipants(participants.includes(person.id)?participants.filter(id=>id!==person.id):[...participants,person.id])} /><span>{person.display_name}</span><b>{participants.includes(person.id)?participants.indexOf(person.id)+1:'—'}</b></label>)}</fieldset><p className="rotation-preview">Próximos responsables: {[0,1,2].map(i=>participants.length?name(participants[i%participants.length]):'—').join(' → ')}</p><button className="game-primary" disabled={busy||!participants.length}>{busy?'Creando…':'Agregar a la habitación'}</button></form></Dialog>}

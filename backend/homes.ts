@@ -1,3 +1,4 @@
+import { initialRooms } from './rooms'
 import { parseAvatar } from '../shared/avatar'
 import { Hono } from 'hono'
 import { clientIp, hash, inviteCode, limit, normalizeCode, now, requireUser } from './security'
@@ -56,6 +57,7 @@ homes.post('/', async (c) => {
       .bind(id, name, timezone, user.id, timestamp),
     c.env.DB.prepare('INSERT INTO home_members (home_id, user_id, role, joined_at) VALUES (?, ?, ?, ?)')
       .bind(id, user.id, 'admin', timestamp),
+    ...initialRooms(c.env.DB,id,timestamp),
   ])
   return c.json({ home: { id, name, timezone, role: 'admin' } }, 201)
 })

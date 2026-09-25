@@ -52,10 +52,10 @@ tasks.get('/', async c => {
   if (!home) return c.json({ error: 'Primero necesitás una casa.' }, 404)
   await materialize(c.env.DB, home)
   const today = dateInZone(home.timezone)
-  const result = await c.env.DB.prepare(`SELECT o.*,t.title,t.room,t.icon,t.frequency,t.active,n.created_at nudged_at,n.actor_id nudged_by FROM task_occurrences o
+  const result = await c.env.DB.prepare(`SELECT o.*,t.title,t.room_id room,t.icon,t.frequency,t.active,n.created_at nudged_at,n.actor_id nudged_by FROM task_occurrences o
     JOIN tasks t ON t.id=o.task_id LEFT JOIN task_nudges n ON n.occurrence_id=o.id WHERE t.home_id=? AND (o.completed_at IS NULL OR o.completed_at>?)
     ORDER BY o.due_date,t.title`).bind(home.id, now() - 30 * 86400).all()
-  const routines = await c.env.DB.prepare('SELECT * FROM tasks WHERE home_id=? ORDER BY created_at DESC').bind(home.id).all()
+  const routines = await c.env.DB.prepare('SELECT id,title,room_id room,active,frequency,points FROM tasks WHERE home_id=? ORDER BY created_at DESC').bind(home.id).all()
   const scores = await c.env.DB.prepare(`SELECT m.user_id userId,
     COALESCE(SUM(o.points),0) points, COUNT(o.id) completed FROM home_members m
     LEFT JOIN (task_occurrences o JOIN tasks t ON t.id=o.task_id)
@@ -76,7 +76,8 @@ tasks.post('/', async c => {
   const people = Array.isArray(data?.participants) ? data.participants : []
   const points = data?.points ?? 10
   const today = dateInZone(home.timezone)
-  if (typeof points !== 'number' || !Number.isInteger(points) || points < 5 || points > 100 || title.length < 2 || title.length > 80 || !['kitchen','bathroom','bedroom','living'].includes(room)
+  const selectedRoom=await c.env.DB.prepare('SELECT kind FROM rooms WHERE id=? AND home_id=?').bind(room,home.id).first<{kind:string}>()
+  if (typeof points !== 'number' || !Number.isInteger(points) || points < 5 || points > 100 || title.length < 2 || title.length > 80 || !selectedRoom
     || !['dishes','trash','clean','laundry'].includes(icon) || !['daily','weekly'].includes(frequency)
     || !/^\d{4}-\d{2}-\d{2}$/.test(firstDate) || !Number.isFinite(dayNumber(firstDate))
     || dateString(dayNumber(firstDate)) !== firstDate || firstDate < today || dayNumber(firstDate) > dayNumber(today) + 365
@@ -87,8 +88,8 @@ tasks.post('/', async c => {
   if (people.some(p => !members.results.some(m => m.user_id === p))) return c.json({ error: 'Los participantes deben pertenecer a la casa.' }, 400)
   const id = crypto.randomUUID()
   await c.env.DB.batch([
-    c.env.DB.prepare('INSERT INTO tasks (id,home_id,title,room,icon,frequency,first_date,created_at,points) VALUES (?,?,?,?,?,?,?,?,?)')
-      .bind(id, home.id, title, room, icon, frequency, firstDate, now(), points),
+    c.env.DB.prepare('INSERT INTO tasks (id,home_id,title,room,icon,frequency,first_date,created_at,points,room_id) VALUES (?,?,?,?,?,?,?,?,?,?)')
+      .bind(id, home.id, title, selectedRoom.kind, icon, frequency, firstDate, now(), points, room),
     ...people.map((p, index) => c.env.DB.prepare('INSERT INTO task_participants (task_id,user_id,position) VALUES (?,?,?)').bind(id, p, index)),
   ])
   const event: GameEvent = { id: crypto.randomUUID(), kind: 'task.created', actorId: c.get('user').id,
@@ -147,7 +148,7 @@ tasks.post('/:id/pause', async c => {
 tasks.get('/history', async c => {
   const home = await membership(c.env.DB, c.get('user').id)
   if (!home) return c.json({ error: 'No tenés una casa.' }, 403)
-  const result = await c.env.DB.prepare(`SELECT e.*, t.title, t.room, u.display_name, o.due_date
+  const result = await c.env.DB.prepare(`SELECT e.*, t.title, t.room_id room, u.display_name, o.due_date
     FROM activity_events e JOIN task_occurrences o ON o.id=e.occurrence_id
     JOIN tasks t ON t.id=o.task_id JOIN users u ON u.id=e.actor_id
     WHERE e.home_id=? ORDER BY e.created_at DESC,e.rowid DESC LIMIT 100`).bind(home.id).all()
@@ -158,7 +159,7 @@ function broadcast(c: Context<AppEnv>, homeId: string, event: GameEvent) {
   c.executionCtx.waitUntil(publishGameEvent(c.env, homeId, event).catch(error => console.error('Game event failed', error)))
 }
 async function occurrenceEvent(c: Context<AppEnv>, id: string, eventId: string, kind: GameEvent['kind']): Promise<GameEvent> {
-  const row = await c.env.DB.prepare(`SELECT o.assignee targetId,t.title,t.room,o.points
+  const row = await c.env.DB.prepare(`SELECT o.assignee targetId,t.title,t.room_id room,o.points
     FROM task_occurrences o JOIN tasks t ON t.id=o.task_id WHERE o.id=?`)
     .bind(id).first<{targetId:string;title:string;room:GameEvent['room'];points:number}>()
   if (!row) throw new Error('Occurrence not found after mutation')

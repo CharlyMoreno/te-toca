@@ -93,7 +93,7 @@ La lista general se accede desde el menú y sirve para revisar todo el hogar de 
 
 **Regla del indicador personal:** «Hechas hoy» cuenta las ocurrencias con fecha de hoy que la persona completó; «Pendientes hoy» cuenta las que tiene asignadas hoy y siguen abiertas; «Atrasadas» cuenta sus ocurrencias abiertas de fechas anteriores. Si no tiene asignaciones hoy, el avatar dice «Sin tareas hoy», no «Todo hecho». Las tareas futuras no afectan ese indicador.
 
-**Límite visual:** habitaciones, objetos y avatares de un catálogo fijo; no se modela la vivienda real ni se representan movimientos reales de las otras personas. La escena respeta movimiento reducido. El ciclo jugable del MVP es explorar, descubrir una tarea, hacerla en la vida real y ver la casa transformarse al registrarla.
+**Límite visual:** tipos de ambiente, objetos y avatares de un catálogo; se pueden crear varios ambientes del mismo tipo; no se modela la vivienda real ni se representan movimientos reales de las otras personas. La escena respeta movimiento reducido. El ciclo jugable del MVP es explorar, descubrir una tarea, hacerla en la vida real y ver la casa transformarse al registrarla.
 
 ### 4. Crear y administrar tareas
 
@@ -237,3 +237,9 @@ Hacer clic en un personaje abre las acciones 😡 enojarme, 🖕 fuck you, 👍 
 ## Charla temporal
 
 El botón «Charlar» abre un campo de hasta 160 caracteres. Enter o Enviar publica el mensaje por el socket privado del hogar. El texto aparece ocho segundos sobre el avatar del autor y reemplaza su globo anterior. El panel muestra los últimos treinta mensajes recibidos durante la sesión; no guarda historial ni entrega mensajes fuera de línea. La identidad y pertenencia al hogar se validan en el servidor, el texto se renderiza como texto plano y el campo se conserva si el envío falla.
+
+## Ampliación de la casa y gráficos
+
+«Menú → Mi casa» permite a la administración agregar ambientes, ponerles nombre, renombrarlos y eliminar los que no tengan tareas. Hay cuatro tipos (cocina, baño, dormitorio y living) y un máximo de doce ambientes. La casa se distribuye automáticamente en dos columnas con pasillo central. Las tareas y la presencia apuntan a cada ambiente concreto, por lo que dos baños tienen pendientes independientes.
+
+La escena incorpora pisos con textura, paredes recortadas, aberturas, cortinas, zócalos y muebles detallados. Madera, textiles, cerámicos, piedra, metal y vidrio tienen respuestas diferentes a la luz. Iluminación y mapas de materiales se generan localmente; no se requieren descargas de modelos externos. La vista simple y el flujo de tareas siguen disponibles.

@@ -37,7 +37,7 @@ La sesión se envía en una cookie `HttpOnly`, `SameSite=Lax` y `Secure` cuando 
 | `task_occurrences` | Fecha, responsable original y actual, finalización y clave de última operación. Combinación tarea–fecha única. |
 | `activity_events` | Historial de finalizaciones y acciones de deshacer, con hogar, actor y ocurrencia. |
 
-Las habitaciones son valores controlados: `kitchen`, `bathroom`, `bedroom`, `living`. La escena traduce sus nombres al español. Las posiciones, muebles, colores y animaciones viven en el frontend.
+Las tareas apuntan a un ambiente mediante `room_id`. El campo anterior `room` conserva su tipo (`kitchen`, `bathroom`, `bedroom`, `living`) para compatibilidad del esquema. Las posiciones, muebles, colores y animaciones viven en el frontend.
 
 Al consultar las tareas, la API genera ocurrencias hasta siete días después de la fecha actual del hogar. El responsable se calcula desde la fecha inicial y el orden de participantes. Las inserciones son idempotentes por tarea y fecha; los atrasos conservan su responsable. Una pausa detiene la generación futura, sin borrar turnos ya generados.
 
@@ -66,6 +66,16 @@ El registro inserta usuario, credenciales y sesión atómicamente. Una colisión
 `/auth/me` informa si una cuenta anterior necesita configurar credenciales. `/auth/legacy-login` acepta una clave anterior vigente únicamente mientras el perfil no tenga contraseña. `/auth/credentials` requiere sesión, inserta credenciales y revoca claves antiguas en un mismo lote; no permite sobrescribir una contraseña existente. Los identificadores, casas, tareas, avatares y puntos permanecen asociados al mismo usuario.
 
 Los sockets también admiten reacciones del catálogo `shared/emotes.ts`. Se revalida la sesión y el destinatario antes de publicar el emoji. No necesitan tablas: son estado efímero del juego.
+
+## Implementado: ambientes por hogar
+
+[`0006_rooms.sql`](../backend/migrations/0006_rooms.sql) crea `rooms`: identificador, hogar, nombre, tipo, posición lógica (`slot`) y fecha. El slot es único por hogar y está limitado a 0–11. La migración crea los cuatro ambientes iniciales de cada hogar y vincula sus tareas mediante `tasks.room_id`; los IDs de tareas y ocurrencias no cambian.
+
+`tasks.room_id` tiene clave foránea a `rooms`. Los triggers de inserción y actualización exigen que la habitación pertenezca al mismo hogar y que el tipo anterior sea consistente. La API devuelve `room` como identificador concreto del ambiente, tanto en tareas como en historial y eventos.
+
+`/api/rooms` permite listar ambientes de la propia casa. Crear, renombrar y quitar requieren administración. La creación selecciona un slot libre mediante una sola sentencia; quitar requiere que no haya tareas referenciándolo y que quede otro ambiente en el hogar. Las nuevas casas insertan sus ambientes iniciales en el mismo lote que hogar y membresía.
+
+La distribución visual se calcula en `shared/rooms.ts`: dos columnas y un corredor central, sin persistir coordenadas de geometría. Los mensajes de movimiento del socket validan que el ID de habitación exista dentro del hogar. Las mutaciones emiten la invalidación habitual para que los clientes actualicen el plano.
 
 ## Pendiente
 

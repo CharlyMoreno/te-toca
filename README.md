@@ -9,7 +9,7 @@ El jugador recorre una pequeña casa 3D con su avatar. En cada habitación encue
 La definición de pantallas, flujos y reglas de uso está en [la especificación funcional del MVP](docs/MVP_FUNCIONAL.md).
 El [modelo de datos](docs/DB_MODEL.md) documenta las migraciones de acceso, hogares, tareas y turnos.
 
-Estado: acceso, hogares, casa 3D, presencia en tiempo real, editor de avatares, tareas recurrentes, turnos automáticos, finalización, deshacer e historial implementados. Los intercambios y la edición de rutinas siguen pendientes; el MVP completo todavía está en desarrollo. Te Toca es el nombre propuesto; su disponibilidad comercial y de dominio no fue verificada.
+Estado: acceso, hogares, casa 3D, presencia en tiempo real, editor de avatares, ampliación de ambientes, tareas recurrentes, turnos automáticos, finalización, deshacer e historial implementados. Los intercambios y la edición de rutinas siguen pendientes; el MVP completo todavía está en desarrollo. Te Toca es el nombre propuesto; su disponibilidad comercial y de dominio no fue verificada.
 
 ## Problema
 
@@ -54,7 +54,7 @@ Un hogar puede registrar sus integrantes, configurar tareas recurrentes y recorr
 
 ### Inicio: nuestra casa
 
-- Casa 3D con cuatro ambientes fijos: cocina, baño, dormitorio y zona común.
+- Casa 3D con cuatro ambientes iniciales y hasta doce personalizables: cocinas, baños, dormitorios y livings con nombres propios.
 - Avatar del jugador que se desplaza hacia la habitación elegida y realiza animaciones breves al completar sus tareas.
 - Avatares 3D de los integrantes activos en la vista general, con nombre y estado: hechas hoy, pendientes hoy y atrasadas.
 - Al tocar un avatar, se ven sus tareas y se resaltan las habitaciones donde tiene pendientes.
@@ -236,6 +236,25 @@ Pausar una rutina detiene la generación de turnos nuevos; los ya generados perm
 
 El entorno local usa una base D1 simulada. Para desplegar, se debe crear la base D1 real, reemplazar el `database_id` de ejemplo en `wrangler.jsonc`, aplicar las migraciones remotas y publicar el Worker. Las contraseñas se guardan como hashes bcrypt con salt; las cookies y los códigos de casa se guardan mediante hashes SHA-256. No hay recuperación por correo en esta versión.
 
+## Casa y ambientes
+
+Desde **Menú → Mi casa**, quien administra puede agregar ambientes de cuatro tipos: cocina, baño, dormitorio y living. Cada ambiente tiene nombre propio, muebles según su tipo, tareas independientes y ubicación dentro del recorrido. Se pueden tener varios baños o dormitorios, hasta un máximo de doce ambientes por casa.
+
+- **Agregar:** elegir tipo y nombre; la casa amplía su distribución automáticamente.
+- **Renombrar:** cambia el nombre sin afectar tareas, puntajes ni historial.
+- **Quitar:** solo ambientes sin tareas asociadas, conservando al menos uno. Las tareas pausadas también conservan su ambiente.
+- Los demás integrantes ven los cambios por el socket. Todos siguen pudiendo crear tareas en cualquiera de los ambientes existentes.
+
+La distribución usa dos columnas con un pasillo central; todavía no incluye arrastrar paredes, elegir medidas ni varios pisos. Al ampliarla, la cámara general se ajusta y cada ambiente sigue teniendo su vista cercana. El selector inferior permite desplazarse horizontalmente si hay muchos ambientes.
+
+### Gráficos
+
+La escena ahora usa materiales con mapas procedurales de madera, piedra, tela, revoque y cerámicos; distintas rugosidades para metal, vidrio y sanitarios; iluminación ambiental generada localmente, luz cálida, sombras de contacto y tone mapping. No descarga texturas, modelos ni HDR externos.
+
+Se incorporaron zócalos, aberturas y cortinas; cocina con mesada, bacha, grifería, horno y banquetas; baño con mampara, ducha, vanitory y espejo estilizado; dormitorio con placard, cabecera tapizada y lámparas; living con textiles, mesa, biblioteca baja y TV. La casa se presenta como una maqueta arquitectónica abierta, con algunas paredes recortadas para mantener visibles tareas y personajes.
+
+Aplicar `npm run db:migrate:local` incorpora `0006_rooms.sql`. Las casas existentes conservan sus cuatro ambientes y sus tareas mediante una migración de referencias. Las nuevas casas reciben la misma distribución inicial.
+
 ## Tareas compartidas, puntos y retos
 
 Todos los integrantes pueden crear tareas. Elegir un participante asigna sus turnos a esa persona; elegir varios genera una rotación. La administración conserva el permiso para pausar rutinas y generar invitaciones.
@@ -304,7 +323,7 @@ La presencia usa la [API de WebSockets con hibernación de Cloudflare](https://d
 - Reparto según esfuerzo, disponibilidad, vacaciones o inteligencia artificial.
 - Frecuencias mensuales, intervalos personalizados y tareas de una sola vez.
 - Transferir una tarea sin intercambio, o intercambiar cadenas de más de dos turnos.
-- Editor de casas, modelos de avatar subidos por usuarios y decoración desbloqueable. La personalización básica del personaje sí está incluida.
+- Editor libre de paredes, medidas y pisos, modelos de avatar subidos por usuarios y decoración desbloqueable. La ampliación automática de ambientes y personalización básica del personaje sí están incluidas.
 - Compras compartidas, gastos, pagos o suscripciones.
 
 ## Criterios de aceptación
