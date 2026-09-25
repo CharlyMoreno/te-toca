@@ -4,7 +4,9 @@
 
 Te Toca es una aplicación web para parejas y compañeros de vivienda que organiza las tareas recurrentes del hogar. Muestra qué hay que hacer, a quién le toca y qué se completó, con turnos automáticos y la posibilidad de intercambiarlos de común acuerdo.
 
-Una pequeña casa 3D representa los ambientes. Las tareas pendientes aparecen como objetos dentro de cada habitación y desaparecen con una animación al completarlas.
+Una pequeña casa 3D representa los ambientes y a sus integrantes mediante avatares. Cada avatar muestra qué tareas hizo y cuáles tiene pendientes. Las tareas aparecen como objetos dentro de cada habitación y desaparecen con una animación al completarlas.
+
+La definición de pantallas, flujos y reglas de uso está en [la especificación funcional del MVP](docs/MVP_FUNCIONAL.md).
 
 Estado: definición del MVP; la aplicación todavía no está implementada. Te Toca es el nombre propuesto. Su disponibilidad comercial y de dominio no fue verificada.
 
@@ -28,22 +30,22 @@ Parejas y grupos pequeños de compañeros de vivienda que quieren repartir tarea
 - Asignar turnos con una regla que todos puedan entender.
 - Permitir cambios acordados cuando alguien no puede cumplir un turno.
 - Consultar un historial compartido para recordar lo realizado.
-- Convertir la casa 3D en una forma de navegar los pendientes y reconocer el progreso.
+- Convertir la casa 3D y sus avatares en una forma de navegar los pendientes y reconocer el progreso de cada integrante.
 
 La hipótesis es que una lista compartida con responsables claros reduce las conversaciones repetidas sobre quién debe hacer cada cosa. La rotación reparte turnos por tarea; no garantiza igual esfuerzo total entre personas.
 
 ## Objetivo del MVP
 
-Un hogar puede registrar sus integrantes, configurar tareas recurrentes, consultar responsables, completar pendientes y acordar intercambios desde distintos dispositivos. Todo con una casa visual sencilla y una lista equivalente para las acciones cotidianas.
+Un hogar puede registrar sus integrantes, configurar tareas recurrentes, ver sus avatares y entrar a cada habitación de una casa 3D para ver qué hay que hacer allí, completar pendientes y acordar intercambios. Una lista general permite consultar todo el hogar y sirve como alternativa accesible.
 
 ## Flujo principal
 
 1. Una persona inicia sesión, crea un hogar y elige su zona horaria.
 2. Comparte un enlace de invitación con los demás integrantes, que se identifican para unirse.
 3. Crea tareas indicando habitación, frecuencia, primera fecha y participantes de la rotación.
-4. La aplicación asigna el primer turno y muestra las tareas que ya están pendientes.
-5. Cada integrante ve sus tareas y las del hogar en la casa 3D o en una lista.
-6. Al completar una tarea propia, su objeto desaparece con una animación y la acción queda registrada.
+4. La aplicación asigna el primer turno y muestra en cada habitación cuántas tareas hay pendientes. Los avatares resumen lo hecho y lo pendiente de cada persona.
+5. Cada integrante entra a una habitación y ve allí los objetos que representan las tareas de hoy y las atrasadas, junto con el responsable de cada una.
+6. Al completar una tarea propia desde esa habitación, su objeto desaparece con una animación y la acción queda registrada.
 7. La siguiente ocurrencia corresponde al próximo integrante de la rotación.
 8. Si necesita cambiar un turno, el integrante propone un intercambio con una tarea de otra persona; el cambio se aplica cuando esta lo acepta.
 
@@ -52,12 +54,16 @@ Un hogar puede registrar sus integrantes, configurar tareas recurrentes, consult
 ### Inicio: nuestra casa
 
 - Casa 3D con cuatro ambientes fijos: cocina, baño, dormitorio y zona común.
-- Objetos que representan tareas pendientes, con responsable y estado accesibles al seleccionarlos.
-- Filtros «Mis tareas» y «Todo el hogar».
-- Lista sincronizada con la escena: tarea, responsable, fecha y acción principal.
-- Sección de próximos turnos para los siguientes siete días.
+- Avatares 3D de los integrantes activos en la vista general, con nombre y estado: hechas hoy, pendientes hoy y atrasadas.
+- Al tocar un avatar, se ven sus tareas y se resaltan las habitaciones donde tiene pendientes.
+- Indicadores de tareas pendientes por ambiente, separados en propias y del hogar.
+- Al entrar en una habitación, objetos que representan sus tareas y tarjetas con avatar del responsable, fecha, estado y acciones.
+- Sección «Hechas hoy» en cada habitación para ver lo completado después de que desaparece el objeto.
+- Filtros «Mis tareas» y «Todo el hogar» dentro de cada habitación.
+- Sección «Próximamente» con los turnos de esa habitación para los siguientes siete días.
+- Lista general accesible desde el menú para consultar todas las habitaciones.
 - Aviso de intercambios por responder.
-- Estado sin pendientes con una casa despejada y un mensaje breve.
+- Habitación sin pendientes despejada y con un mensaje breve.
 
 ### Configuración del hogar
 
@@ -78,7 +84,7 @@ Un hogar puede registrar sus integrantes, configurar tareas recurrentes, consult
 
 - Un hogar activo por usuario en el MVP.
 - Inicio de sesión por enlace enviado al correo.
-- Hasta seis integrantes, con nombre visible y color identificador.
+- Hasta seis integrantes, con nombre visible, color identificador y un avatar 3D simple.
 - La persona creadora administra el hogar, las invitaciones y las tareas.
 - Los demás integrantes consultan el hogar, completan sus tareas y gestionan sus intercambios.
 - Una invitación requiere autenticación y deja de permitir ingresos si se revoca o se alcanza el límite de integrantes.
@@ -150,20 +156,20 @@ La casa será una escena pequeña de estilo ilustrado, con vista isométrica y g
 - Dormitorio: ropa o una caja para ordenar.
 - Zona común: escoba u objetos sobre una mesa.
 
-Al seleccionar un objeto, se abre el detalle de la tarea. Al completarla, el objeto se reduce y desaparece suavemente. Si representa varias ocurrencias pendientes, disminuye el contador y permanece hasta resolverlas.
+La casa indica cuántas tareas pendientes hay en cada ambiente. En la vista general, los avatares de quienes viven allí muestran cuántas tareas de hoy hicieron, cuáles siguen pendientes y si tienen atrasadas. Seleccionar un avatar resalta las habitaciones donde tiene tareas. Al entrar en una habitación, se ven sus objetos de tareas y el responsable de cada una. Al completar una tarea, su objeto se reduce y desaparece suavemente; la sección «Hechas hoy» conserva el registro visible. Si un objeto representa varias ocurrencias pendientes, disminuye el contador y permanece hasta resolverlas.
 
-Los objetos próximos aún no vencidos se muestran en la lista de próximos turnos; la escena principal representa las tareas de hoy y las atrasadas. Los detalles se consultan con clic o toque, sin depender de pasar el cursor.
+Los turnos futuros de cada ambiente aparecen en la sección «Próximamente» de esa habitación; los objetos representan las tareas de hoy y las atrasadas. Los detalles se consultan con clic o toque, sin depender de pasar el cursor.
 
-La casa debe permitir elegir habitaciones y restablecer la cámara. No incluye movimiento libre de personajes, física ni personalización de muebles. Las animaciones son breves y respetan la preferencia de movimiento reducido.
+La casa debe permitir elegir habitaciones y restablecer la cámara. Los avatares son figuras simples, con un color identificador, y no representan la ubicación real de las personas. No incluye movimiento libre de personajes, física ni personalización de muebles. Las animaciones son breves y respetan la preferencia de movimiento reducido.
 
-Todas las acciones también están disponibles en la lista mediante teclado. El responsable y el estado se indican con texto además de color. Si WebGL no está disponible, el flujo completo funciona desde la lista.
+Todas las acciones también están disponibles mediante teclado y en la lista general. El responsable y el estado se indican con texto además de color. Si WebGL no está disponible, el flujo completo funciona desde una vista de habitaciones en 2D y sus listas de tareas.
 
 ## Datos mínimos
 
 | Entidad | Datos principales |
 | --- | --- |
 | Hogar | Identificador, nombre, zona horaria y administrador |
-| Integrante | Usuario autenticado, hogar, nombre y color |
+| Integrante | Usuario autenticado, hogar, nombre, color y variante de avatar |
 | Invitación | Hogar, token y estado de revocación |
 | Tarea | Título, habitación, icono, frecuencia, fecha inicial, participantes ordenados y estado |
 | Ocurrencia | Tarea, fecha, índice de rotación, responsable original, responsable actual, estado y finalización |
@@ -177,13 +183,15 @@ La combinación de tarea y fecha identifica de forma única cada ocurrencia. Las
 - **React + TypeScript + Vite** para la aplicación web.
 - **Three.js con React Three Fiber** para la casa y las animaciones.
 - **CSS** para diseño adaptable y transiciones de interfaz.
-- **Supabase** como opción inicial para autenticación, PostgreSQL y reglas de acceso por hogar.
-- Operaciones de servidor para generar ocurrencias y aceptar intercambios de forma atómica.
+- **Cloudflare D1** como base de datos SQL del hogar, integrantes, tareas, ocurrencias, intercambios e historial.
+- **Cloudflare Workers** como API: valida sesiones y permisos, accede a D1 mediante un binding y ejecuta las reglas de turnos.
+- Acceso por enlace enviado al correo, con usuarios y sesiones gestionados por la API. La entrega de correos requiere un proveedor que se elegirá al implementar.
+- Operaciones atómicas en la API para generar ocurrencias y aceptar intercambios, con condiciones que impidan aplicar acciones duplicadas o vencidas.
 - Actualización de datos al abrir o volver a la aplicación y después de cada acción; la sincronización instantánea queda fuera del MVP.
 
-La lógica de tareas y rotaciones será independiente de la escena 3D. Los datos compartidos se guardan en el servidor. El MVP requiere conexión; si una operación falla, la interfaz informa el error y permite reintentar sin mostrarla como completada.
+La lógica de tareas y rotaciones será independiente de la escena 3D. Los datos compartidos se guardan en D1. El MVP requiere conexión; si una operación falla, la interfaz informa el error y permite reintentar sin mostrarla como completada.
 
-Las credenciales con privilegios de servidor nunca deben incluirse en el cliente. Cada usuario solo puede acceder a los datos de su hogar; conocer un identificador no concede acceso.
+El navegador no accede directamente a D1: cada operación pasa por un Worker que comprueba la identidad, la pertenencia al hogar y el permiso correspondiente. Conocer un identificador no concede acceso.
 
 Este stack es una propuesta de implementación, no una lista de dependencias ya instaladas.
 
@@ -197,7 +205,7 @@ Este stack es una propuesta de implementación, no una lista de dependencias ya 
 - Reparto según esfuerzo, disponibilidad, vacaciones o inteligencia artificial.
 - Frecuencias mensuales, intervalos personalizados y tareas de una sola vez.
 - Transferir una tarea sin intercambio, o intercambiar cadenas de más de dos turnos.
-- Editor de casas, avatares y decoración desbloqueable.
+- Editor detallado de casas y avatares, y decoración desbloqueable.
 - Compras compartidas, gastos, pagos o suscripciones.
 
 ## Criterios de aceptación
@@ -207,6 +215,8 @@ Este stack es una propuesta de implementación, no una lista de dependencias ya 
 - Una tarea diaria o semanal genera las ocurrencias esperadas según la zona horaria, sin duplicados.
 - La rotación respeta el orden configurado y mantiene los responsables de las ocurrencias atrasadas.
 - Completar una tarea actualiza la lista, la escena y el historial una sola vez.
+- Cada avatar muestra las tareas de hoy completadas y pendientes, más los atrasos de su integrante; si no tiene tareas hoy, indica «Sin tareas hoy».
+- Al tocar un avatar se destacan las habitaciones con tareas pendientes de esa persona.
 - Una propuesta de intercambio no cambia responsables hasta que el destinatario la acepta.
 - Aceptar un intercambio válido cambia ambas asignaciones juntas y conserva la rotación futura.
 - Un intercambio inválido o ya resuelto no puede aplicarse nuevamente.

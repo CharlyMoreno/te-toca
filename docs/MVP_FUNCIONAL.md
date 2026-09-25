@@ -1,0 +1,217 @@
+# Te Toca — definición funcional del MVP
+
+## Qué tiene que lograr el usuario
+
+Una persona crea una casa, invita a quienes viven con ella y configura tareas que se repiten. En la casa 3D ve avatares de los integrantes y el estado de sus tareas. Entra a una habitación para ver qué hay que hacer allí, completar sus tareas o intercambiar un turno. El hogar puede consultar lo realizado.
+
+El producto se organiza alrededor de una **ocurrencia**: una tarea concreta en una fecha concreta. Por ejemplo, «limpiar el baño el sábado 3» es una ocurrencia de la tarea recurrente «limpiar el baño». Completarla o intercambiarla no altera por sí solo las fechas ni los responsables de las ocurrencias posteriores.
+
+## Alcance inicial
+
+- Un hogar por cuenta, pensado para 2 a 6 integrantes. Puede tener una sola persona mientras se aceptan las invitaciones.
+- Cuatro habitaciones predefinidas: cocina, baño, dormitorio y zona común.
+- Un avatar 3D simple por integrante activo, asociado a su nombre y color.
+- Tareas diarias o semanales, con una persona responsable en cada fecha.
+- Rotación circular entre los participantes seleccionados para cada tarea.
+- Intercambio de dos ocurrencias pendientes, sujeto a aceptación.
+- Historial de tareas completadas e intercambios.
+- Aplicación web adaptable a móvil y escritorio.
+
+La casa 3D permite un recorrido guiado entre habitaciones mediante clic, toque o controles visibles. Los avatares muestran el progreso de cada persona; no representan su ubicación física ni requieren que alguien los controle.
+
+## Flujo completo
+
+```text
+Entrar → Crear casa → Invitar integrantes → Crear tareas
+       → Ver integrantes y habitaciones → Entrar a una habitación → Ver sus tareas
+       → Completar / intercambiar → Consultar historial
+```
+
+Una persona invitada sigue este flujo:
+
+```text
+Abrir invitación → Entrar o registrarse → Aceptar invitación
+                → Entrar a una habitación y ver sus tareas
+```
+
+## Componentes funcionales
+
+### 1. Acceso
+
+**Qué hace:** identifica a cada persona para mantener sus acciones y mostrarle solo la casa a la que pertenece.
+
+- Entrada con enlace enviado al correo electrónico.
+- Si es su primera vez, se le pide un nombre visible.
+- La sesión se conserva al volver a abrir la aplicación.
+- Si no tiene casa, puede crear una o aceptar una invitación válida.
+- Si tiene casa, entra directamente a la vista principal.
+- Puede cerrar sesión.
+
+**Estados:** correo enviado, enlace inválido o vencido, error al entrar.
+
+### 2. Casa e integrantes
+
+**Qué hace:** crea el espacio compartido y controla quién puede entrar.
+
+- La persona creadora indica nombre de la casa y zona horaria.
+- Se crea como administradora y ve una casa vacía con la acción «Agregar primera tarea».
+- Puede invitar a alguien indicando su correo. La invitación queda «pendiente» hasta que esa persona la acepta.
+- Al aceptarla, el invitado pasa a ser integrante activo y aparece en la casa.
+- Cada integrante activo tiene un avatar 3D sencillo con nombre y color identificador. El color se elige al crear su perfil y puede cambiarse después.
+- La administradora puede copiar o revocar una invitación pendiente.
+- Se muestran integrantes activos e invitaciones pendientes por separado.
+- Solo los integrantes activos pueden formar parte de una rotación y asumir tareas.
+- Una cuenta no puede aceptar una invitación de otra casa mientras pertenezca a una.
+
+Para simplificar el primer lanzamiento, el administrador configura tareas e invitaciones; cualquier integrante puede ver tareas, completar las propias y gestionar intercambios.
+
+**Estados:** invitación vencida o revocada, cupo de seis integrantes alcanzado, correo ya invitado, usuario ya integrante.
+
+### 3. Casa 3D y recorrido
+
+**Qué hace:** organiza las tareas espacialmente. La habitación es la pantalla donde se consultan y resuelven sus pendientes.
+
+- La vista inicial muestra una casa abierta con las cuatro habitaciones.
+- Los avatares de los integrantes activos aparecen en un espacio común de la vista general. Cada uno muestra su nombre y un indicador de tareas de hoy completadas, pendientes y atrasadas.
+- Al seleccionar un avatar, se abre una tarjeta con sus tareas de hoy, las atrasadas y las hechas hoy; además, se resaltan las habitaciones donde tiene pendientes.
+- Cuando alguien completa una tarea, su indicador y la habitación correspondiente se actualizan para todos los integrantes al volver a consultar los datos.
+- Cada habitación indica cuántas tareas pendientes tiene el integrante y cuántas tiene el hogar. Así se sabe adónde ir antes de entrar.
+- El usuario selecciona una habitación y la cámara se acerca con una transición breve. Allí ve el nombre del ambiente, sus tareas de hoy y las atrasadas, y quién es responsable de cada una.
+- Las tareas se representan como objetos o marcadores dentro de la habitación. Al tocar uno se abre una tarjeta con nombre, fecha, responsable y acciones.
+- Si hay varias ocurrencias de la misma tarea, el marcador muestra un contador y la tarjeta permite verlas por separado.
+- Cada marcador muestra el avatar o nombre de su responsable. La sección «Hechas hoy» de la habitación permite comprobar qué se completó y quién lo hizo, aunque el objeto haya desaparecido.
+- Los próximos turnos de esa habitación aparecen en una sección plegada llamada «Próximamente», dentro de la misma vista.
+- Desde la habitación se puede agregar una tarea nueva; el ambiente queda preseleccionado en el formulario.
+- Al confirmar que una ocurrencia se completó, su objeto desaparece o reduce su contador. La habitación actualiza su número de pendientes.
+- Botones visibles permiten volver a la vista general y pasar a otra habitación.
+- Si la habitación está al día, se muestra despejada con el mensaje «Por acá está todo listo».
+
+La lista general se accede desde el menú y sirve para revisar todo el hogar de una vez. La misma tarjeta y acciones de cada tarea están disponibles allí y en una vista sin 3D para accesibilidad o fallas de WebGL.
+
+**Regla del indicador personal:** «Hechas hoy» cuenta las ocurrencias con fecha de hoy que la persona completó; «Pendientes hoy» cuenta las que tiene asignadas hoy y siguen abiertas; «Atrasadas» cuenta sus ocurrencias abiertas de fechas anteriores. Si no tiene asignaciones hoy, el avatar dice «Sin tareas hoy», no «Todo hecho». Las tareas futuras no afectan ese indicador.
+
+**Límite visual:** habitaciones, objetos y avatares de un catálogo fijo; no se modela la vivienda real ni se representan movimientos reales de las personas. La escena respeta movimiento reducido.
+
+### 4. Crear y administrar tareas
+
+**Qué hace:** define qué se hace, dónde, cuándo y entre quiénes rota.
+
+Formulario mínimo:
+
+| Campo | Regla |
+| --- | --- |
+| Nombre | Obligatorio; por ejemplo, «Sacar la basura» |
+| Habitación | Una de las cuatro disponibles |
+| Icono | Uno de un pequeño catálogo, con opción sugerida según la tarea |
+| Frecuencia | Diaria o semanal |
+| Primera fecha | Define el inicio; en la semanal también define el día de la semana |
+| Participantes | Uno o más integrantes activos, en el orden de rotación |
+
+- La administradora puede crear, editar y pausar una tarea.
+- Se pueden usar plantillas editables para las tareas comunes, sin agregarlas automáticamente.
+- Antes de guardar se muestra una vista previa de los tres turnos siguientes.
+- Los cambios de frecuencia o participantes se aplican a las próximas ocurrencias aún no generadas. Las existentes conservan su asignación.
+- Al reactivar una tarea pausada se elige una nueva primera fecha.
+
+**Estados:** falta un dato obligatorio, no hay integrantes activos para asignar, tarea pausada.
+
+### 5. Asignación automática y pendientes
+
+**Qué hace:** determina a quién le corresponde cada ocurrencia.
+
+- La primera fecha se asigna al primer participante de la rotación; cada nueva fecha avanza al siguiente y vuelve al primero al terminar la lista.
+- La rotación de cada tarea es independiente de las otras.
+- El calendario determina los turnos aunque una tarea anterior esté atrasada o alguien la termine tarde.
+- Se preparan las ocurrencias de hoy, las atrasadas y las de los próximos siete días, sin duplicados.
+- Si nadie usa la app durante varios días, los pendientes omitidos aparecen al volver.
+- Una ocurrencia vencida que sigue abierta aparece como «Atrasada» con su fecha original.
+
+Dentro de cada habitación se puede alternar entre **Mis tareas** y **Todas**. Las ocurrencias se muestran primero por atraso y luego por fecha. La lista general aplica el mismo orden e incluye la habitación de cada tarea.
+
+### 6. Completar tareas
+
+**Qué hace:** registra que la persona responsable terminó una ocurrencia.
+
+- El responsable abre el detalle y pulsa «Marcar como hecha».
+- La acción guarda quién la completó y cuándo, y actualiza casa, lista e historial.
+- Se ofrece «Deshacer» durante diez segundos para corregir un toque accidental.
+- Pulsar dos veces o actuar desde dos dispositivos no produce dos finalizaciones.
+- Una persona que no es responsable puede ver la tarea, pero no completarla.
+
+### 7. Intercambiar turnos
+
+**Qué hace:** permite acordar un cambio concreto cuando dos integrantes necesitan reorganizarse.
+
+- Desde una ocurrencia propia pendiente, el usuario elige «Proponer intercambio».
+- Selecciona una ocurrencia pendiente de otra persona. Ambos deben participar en la rotación de las dos tareas.
+- La otra persona recibe la solicitud dentro de la app y puede aceptarla o rechazarla.
+- El solicitante puede cancelarla antes de la respuesta.
+- Al aceptar, ambas ocurrencias cambian de responsable juntas. La rotación de fechas futuras sigue igual.
+- Si alguna de las dos se completa o cambia mientras la solicitud está pendiente, la solicitud caduca y no se puede aceptar.
+- Ninguna ocurrencia puede estar en dos solicitudes pendientes al mismo tiempo.
+
+**Estado visible:** propuesta enviada, recibida, aceptada, rechazada, cancelada o caducada.
+
+### 8. Historial
+
+**Qué hace:** permite reconstruir lo que ocurrió sin generar una competencia entre integrantes.
+
+- Lista cronológica de tareas completadas: tarea, fecha prevista, persona que la hizo y fecha real.
+- Registro de intercambios aceptados, con ambas personas y tareas involucradas.
+- Registro de deshacer una finalización.
+- Filtros sencillos por integrante y mes.
+- Sin puntajes, rankings ni estadísticas de rendimiento en el MVP.
+
+## Pantallas y elementos de interfaz
+
+| Pantalla | Elementos principales |
+| --- | --- |
+| Acceso | Correo, envío de enlace, nombre visible cuando corresponda |
+| Crear casa | Nombre de la casa, zona horaria, confirmación |
+| Integrantes | Lista de activos, invitaciones pendientes, formulario para invitar |
+| Inicio | Casa 3D, avatares y progreso de integrantes, pendientes por habitación y acceso a cada una |
+| Habitación | Objetos de tareas, responsables con su avatar, tarjetas con acciones, hechas hoy y próximas tareas |
+| Detalle de tarea | Responsable, fecha, estado, completar, proponer intercambio |
+| Administrar tareas | Listado, plantillas, formulario, vista previa de rotación, pausar |
+| Intercambios | Recibidos, enviados y respuesta a una propuesta |
+| Historial | Actividad cronológica y filtros |
+
+En móvil y escritorio, se entra primero a la casa. Al elegir una habitación se muestra su escena y sus tareas sin salir de ella; en móvil, las tarjetas pueden abrirse sobre la escena. La lista general queda en el menú para quien quiera ver todos los pendientes juntos.
+
+## Reglas comunes
+
+- Cada usuario solo puede ver y modificar datos de su hogar.
+- Las fechas se interpretan en la zona horaria elegida para la casa.
+- Ninguna operación aparece como completada antes de guardarse correctamente.
+- Se confirma antes de pausar una tarea o revocar una invitación.
+- Todos los estados importantes tienen texto; el color y la animación son apoyos visuales.
+- Los botones y detalles se pueden usar con teclado, además de clic y toque.
+
+## Base de datos y API
+
+- La base de datos del MVP es **Cloudflare D1**. Guarda hogares, integrantes, invitaciones, tareas, ocurrencias, solicitudes de intercambio e historial.
+- Una API en **Cloudflare Workers** recibe las acciones del navegador y accede a D1 mediante un binding. El cliente nunca consulta ni modifica D1 directamente.
+- El Worker verifica la sesión, la pertenencia al hogar y los permisos antes de devolver o cambiar datos. D1 no reemplaza esta lógica de autorización.
+- La entrada por enlace de correo requiere gestionar usuarios, enlaces de un solo uso y sesiones desde la API, además de elegir un servicio que entregue los correos.
+- Completar una tarea o aceptar un intercambio debe guardar los cambios relacionados de forma atómica y comprobar que la ocurrencia sigue pendiente. Así se evitan duplicados y cambios parciales entre dispositivos.
+- El esquema se gestionará con migraciones SQL. Cada ocurrencia tendrá una clave única formada por tarea y fecha.
+
+## Qué queda fuera
+
+- Editor detallado de casas o avatares, movimiento libre en primera persona y presencia en tiempo real.
+- Notificaciones push, recordatorios por correo y chat.
+- Tareas mensuales, tareas únicas y horarios límite configurables.
+- Sugerencias automáticas según esfuerzo o disponibilidad.
+- Varios hogares por cuenta, cambio de administrador y eliminación de integrantes.
+- Tareas compartidas que requieren varias personas al mismo tiempo.
+- Fotos como prueba, puntos, premios y castigos.
+
+## Orden recomendado de construcción
+
+1. Acceso, casa e invitaciones.
+2. Tareas y rotación con vista previa.
+3. Lista de pendientes y finalización.
+4. Intercambios e historial.
+5. Casa 3D, avatares con progreso y recorrido guiado conectados a las mismas tareas.
+
+El paso 3 sirve para comprobar las reglas de tareas y rotación. La experiencia completa del MVP requiere los cinco pasos, incluido el recorrido por las habitaciones.
