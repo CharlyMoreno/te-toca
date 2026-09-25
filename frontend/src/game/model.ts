@@ -1,10 +1,11 @@
+import type { AvatarConfig } from '../../../shared/avatar'
 export type RoomId = 'kitchen' | 'bathroom' | 'bedroom' | 'living'
-export type Person = { id: string; display_name: string; role?: string }
+export type Person = { id: string; display_name: string; role?: string; avatar?: AvatarConfig }
 export type House = { id: string; name: string; timezone: string; role: 'admin' | 'member' }
 export type Occurrence = {
   id: string; task_id: string; title: string; room: RoomId; icon: string;
   due_date: string; assignee: string; completed_at: number | null; completed_by: string | null;
-  frequency: string; active: number
+  frequency: string; active: number; points: number; nudged_at: number | null; nudged_by: string | null
 }
 export type Routine = { id: string; title: string; room: RoomId; active: number; frequency: string }
 export const rooms: { id: RoomId; name: string; color: string; floor: string; position: [number, number]; icon: string; suggestion: string }[] = [

@@ -1,12 +1,12 @@
 # Propuesta de infraestructura de Te Toca
 
-Estado: propuesta para implementar. Fecha de revisión: 2026-09-25.
+Estado: configuración local implementada; infraestructura remota pendiente. Fecha de revisión: 2026-09-25.
 
 ## Base del análisis
 
-Se revisaron el [README](../README.md), la [definición funcional](MVP_FUNCIONAL.md) y los recursos de marca en `public/brand/`, después de actualizar el repositorio hasta `d883c7e`. Todavía no hay aplicación, dependencias, migraciones ni configuración de despliegue. Este documento define el destino de implementación; no representa infraestructura ya provisionada.
+Se revisaron el [README](../README.md), la [definición funcional](MVP_FUNCIONAL.md) y los recursos de marca en `public/brand/`, después de actualizar el repositorio hasta `d883c7e`. La aplicación, sus dependencias, migraciones y configuración local ya están implementadas. Este documento combina decisiones implementadas con el plan de publicación; no representa infraestructura remota provisionada.
 
-El alcance actual es un juego de navegador para hogares de hasta seis personas, con tareas recurrentes, intercambios y recorrido guiado por una casa 3D. Los avatares muestran progreso guardado, no presencia ni posiciones compartidas en tiempo real. Esto permite un cliente estático y una API HTTP, sin servidor de juego persistente ni WebSockets.
+El alcance actual es un juego de navegador para hogares de hasta seis personas, con tareas recurrentes, intercambios y recorrido guiado por una casa 3D. Los avatares muestran progreso guardado y presencia en tiempo real por habitación. Un Durable Object por casa coordina los WebSockets; D1 conserva tareas y apariencia.
 
 El stack acordado en los documentos es React, TypeScript, Vite, React Three Fiber y Drei en el cliente; Hono y TypeScript en Workers; D1 para persistencia. Supabase no forma parte de esta propuesta.
 
@@ -17,6 +17,8 @@ flowchart LR
     U[Navegador: interfaz y escena 3D] --> S[Workers Static Assets]
     U -->|HTTPS /api/*| W[Worker: API Hono]
     W -->|binding DB| D[(D1 del entorno)]
+    U <-->|WebSocket /api/presence| W
+    W <-->|binding HOUSE_PRESENCE| P[Durable Object por casa]
     G[CI: código de confianza] -->|migraciones y despliegue| W
     G -->|build del cliente| S
 ```
@@ -25,7 +27,8 @@ flowchart LR
 | --- | --- | --- |
 | Workers Static Assets | HTML, JavaScript, CSS, marca y catálogo 3D | Publicar junto al Worker |
 | Worker con Hono | Sesiones, autorización, hogares, tareas e intercambios | Un Worker por entorno, organizado en módulos |
-| D1 | Datos de negocio y autenticación | Una base por entorno, binding `DB` |
+| D1 | Datos de negocio, apariencia y autenticación | Una base por entorno, binding `DB` |
+| Durable Objects | Presencia, habitación e invalidación de datos por WebSocket | Clase `HousePresence`, binding `HOUSE_PRESENCE`, instancia por hogar |
 | Dominio y HTTPS | Punto público de acceso | Subdominio inicial de Workers; dominio propio al lanzamiento si está disponible |
 | R2 | Archivos grandes o contenido incorporado posteriormente | Opcional, fuera del despliegue inicial |
 
@@ -33,7 +36,7 @@ La web y la API compartirán origen. Configurar el fallback de SPA para navegaci
 
 Cloudflare permite publicar el Worker y los archivos estáticos como una unidad. La selección de rutas evita ejecutar lógica de aplicación para cada archivo estático. [Static Assets](https://developers.cloudflare.com/workers/static-assets/), [rutas del Worker](https://developers.cloudflare.com/workers/static-assets/routing/worker-script/).
 
-El navegador renderiza la casa, los avatares y las animaciones. Cargar la escena de forma diferida y mantener las vistas 2D y listas operativas sin WebGL. Solo el estado de negocio confirmado modifica el progreso visible; los movimientos de cámara y avatar son locales.
+El navegador renderiza la casa, los avatares y las animaciones. Cargar la escena de forma diferida y mantener las vistas 2D y listas operativas sin WebGL. Solo el estado de negocio confirmado modifica el progreso visible; la cámara es local y los cambios de habitación se comparten por socket. Cada cliente anima el recorrido de los avatares conectados.
 
 ## Datos y consistencia
 
@@ -53,15 +56,13 @@ D1 dispone de `batch()` transaccional: si una sentencia falla, se revierte el lo
 
 La generación concurrente y las acciones repetidas deben producir un único efecto. No habilitar réplicas de lectura inicialmente; si se incorporan, revisar explícitamente consistencia y lectura posterior a escritura.
 
-## Autenticación por códigos
+## Autenticación con usuario y contraseña
 
-El Worker gestiona perfiles, claves personales y sesiones. La implementación inicial está en `backend/auth.ts` y `backend/security.ts`. No requiere correo electrónico.
+El Worker registra usuarios sin correo electrónico, con username único normalizado y contraseña bcrypt de costo 12 con salt aleatorio. D1 almacena el hash en `user_credentials`. `bcryptjs` requiere `nodejs_compat`, configurado en Wrangler. Presupuestar el consumo de CPU del hashing al elegir el plan remoto: el costo 12 puede exceder el límite de CPU del plan gratuito.
 
-Al crear un perfil, se genera una clave personal aleatoria de 100 bits y se muestra una sola vez. D1 conserva únicamente su hash. Las sesiones vencen a los 30 días y usan cookies `HttpOnly`, `SameSite=Lax` y `Secure` sobre HTTPS. Cerrar sesión revoca la sesión actual. Las mutaciones validan origen y formato JSON; los intentos de acceso tienen límites.
+Las sesiones siguen durando treinta días con cookies `HttpOnly`, `SameSite=Lax` y `Secure` sobre HTTPS. Los intentos tienen límites por IP y username. No se registran contraseñas, cookies ni códigos en logs.
 
-Los códigos de casa son independientes de las claves personales. Caducan a los siete días; generar otro revoca el anterior. La unión exige una sesión válida, cupo disponible y que el usuario no pertenezca a otra casa. No registrar claves, códigos ni cookies en logs.
-
-La recuperación de una cuenta sin clave ni sesión activa está fuera de esta primera implementación.
+Las cuentas anteriores pasan por configuración de credenciales utilizando su sesión o clave anterior. La transición mantiene todos sus datos y revoca las claves anteriores. Las invitaciones por código continúan iguales. No hay recuperación por correo implementada.
 
 ## Entornos y configuración
 
@@ -106,6 +107,6 @@ Separar permisos de CI por entorno cuando sea posible. Para despliegue y migraci
 
 Antes de producción deben resolverse estrategia de recuperación de cuentas, dominio, plan y presupuesto, retención operativa y responsables de recuperación. Verificar los permisos efectivos y la habilitación de los servicios al provisionar, sin publicar detalles de cuentas o tokens en esta documentación.
 
-R2 queda diferido porque el MVP no permite subir archivos y el catálogo puede acompañar al build. Si el tamaño de los modelos supera los límites del hosting estático o requiere publicación independiente, incorporarlo con binding y una política explícita de acceso. Tampoco se requieren inicialmente KV, Queues, Durable Objects ni un cron.
+R2 queda diferido porque el MVP no permite subir archivos y el catálogo puede acompañar al build. Si el tamaño de los modelos supera los límites del hosting estático o requiere publicación independiente, incorporarlo con binding y una política explícita de acceso. No se requieren inicialmente KV, Queues ni un cron. Durable Objects sí se utiliza para presencia; su migración `v1-house-presence` está definida en `wrangler.jsonc`. Usa WebSockets con hibernación, latidos y alarmas para descartar conexiones abandonadas y revalidar las sesiones.
 
 La propuesta estará implementada cuando staging y producción estén separados, una versión pueda desplegarse y recuperarse de forma reproducible, las pruebas de concurrencia e aislamiento pasen y el flujo completo funcione en móvil, con teclado y sin WebGL. La infraestructura por sí sola no completa el MVP: deben cumplirse los criterios funcionales del producto.

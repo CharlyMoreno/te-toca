@@ -4,7 +4,7 @@ import GameHouse from './game/GameHouse'
 type User = { id: string; display_name: string }
 type Home = { id: string; name: string; timezone: string; role: 'admin' | 'member' }
 type Member = { id: string; display_name: string; role: 'admin' | 'member' }
-type Screen = 'loading' | 'welcome' | 'register' | 'login' | 'invited' | 'save-key' | 'choose-home' | 'create-home' | 'join-home' | 'home'
+type Screen = 'loading' | 'welcome' | 'register' | 'login' | 'invited' | 'setup-credentials' | 'legacy-login' | 'choose-home' | 'create-home' | 'join-home' | 'home'
 
 async function api<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
   const response = await fetch(`/api${path}`, {
@@ -31,17 +31,15 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null)
   const [home, setHome] = useState<Home | null>(null)
   const [members, setMembers] = useState<Member[]>([])
-  const [name, setName] = useState('')
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [personalKey, setPersonalKey] = useState('')
   const [inviteInput, setInviteInput] = useState('')
-  const [savedKey, setSavedKey] = useState('')
   const [pendingInvite, setPendingInvite] = useState('')
   const [homeName, setHomeName] = useState('')
-  const [newInvite, setNewInvite] = useState('')
-  const [inviteExpiry, setInviteExpiry] = useState<number | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const [copied, setCopied] = useState(false)
 
   async function loadHome() {
     const result = await api<{ home: Home | null; members: Member[] }>('/homes/current')
@@ -51,17 +49,19 @@ export default function App() {
   }
 
   useEffect(() => {
-    api<{ user: User }>('/auth/me')
-      .then(async ({ user: current }) => {
+    api<{ user: User; needsCredentials:boolean }>('/auth/me')
+      .then(async ({ user: current, needsCredentials }) => {
         setUser(current)
-        await loadHome()
+        if(needsCredentials)setScreen('setup-credentials')
+        else await loadHome()
       })
       .catch(() => setScreen('welcome'))
   }, [])
 
   function show(next: Screen) {
     setError('')
-    setCopied(false)
+    setPassword('')
+    setShowPassword(false)
     setScreen(next)
   }
 
@@ -71,45 +71,51 @@ export default function App() {
     try { await action() } catch (caught) { setError(getError(caught)) } finally { setBusy(false) }
   }
 
+  async function finishAccount(invite = '') {
+    if(invite) {
+      const result=await api<{home:Home|null}>('/homes/current')
+      if(!result.home) {
+        try { await api('/homes/join','POST',{inviteCode:invite}) }
+        catch(error) { setInviteInput(invite);show('join-home');throw error }
+      }
+    }
+    setPendingInvite('')
+    await loadHome()
+  }
+
   function submitRegister(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const joining = screen === 'invited'
-    void perform(async () => {
-      const result = await api<{ user: User; accessCode: string }>('/auth/register', 'POST', { displayName: name })
-      setUser(result.user)
-      setSavedKey(result.accessCode)
-      setPendingInvite(joining ? inviteInput : '')
-      show('save-key')
+    const joining=screen==='invited'
+    void perform(async()=>{
+      const result=await api<{user:User}>('/auth/register','POST',{username,password})
+      setUser(result.user);setPassword('')
+      await finishAccount(joining?inviteInput:'')
     })
   }
 
   function submitLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    void perform(async () => {
-      const result = await api<{ user: User }>('/auth/login', 'POST', { accessCode: personalKey })
-      setUser(result.user)
-      setPersonalKey('')
-      await loadHome()
+    void perform(async()=>{
+      const result=await api<{user:User}>('/auth/login','POST',{username,password})
+      setUser(result.user);setPassword('')
+      await finishAccount(pendingInvite)
     })
   }
 
-  function continueAfterKey() {
-    void perform(async () => {
-      const invite = pendingInvite
-      setSavedKey('')
-      setPendingInvite('')
-      if (invite) {
-        try {
-          await api('/homes/join', 'POST', { inviteCode: invite })
-          await loadHome()
-        } catch (caught) {
-          setInviteInput(invite)
-          show('join-home')
-          throw caught
-        }
-      } else {
-        show('choose-home')
-      }
+  function submitLegacy(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    void perform(async()=>{
+      const result=await api<{user:User}>('/auth/legacy-login','POST',{accessCode:personalKey})
+      setUser(result.user);setPersonalKey('');show('setup-credentials')
+    })
+  }
+
+  function submitCredentials(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    void perform(async()=>{
+      await api('/auth/credentials','POST',{username,password})
+      setPassword('')
+      await finishAccount(pendingInvite)
     })
   }
 
@@ -131,31 +137,13 @@ export default function App() {
     })
   }
 
-  function generateInvite() {
-    void perform(async () => {
-      const result = await api<{ inviteCode: string; expiresAt: number }>('/homes/invite', 'POST', {})
-      setNewInvite(result.inviteCode)
-      setInviteExpiry(result.expiresAt)
-      setCopied(false)
-    })
-  }
-
-  async function copy(value: string) {
-    try {
-      await navigator.clipboard.writeText(value)
-      setCopied(true)
-    } catch {
-      setError('No se pudo copiar. Seleccioná el código para guardarlo.')
-    }
-  }
-
   function logout() {
     void perform(async () => {
       await api('/auth/logout', 'POST', {})
       setUser(null)
       setHome(null)
       setMembers([])
-      setNewInvite('')
+      setUsername('');setPassword('');setPersonalKey('');setPendingInvite('')
       show('welcome')
     })
   }
@@ -177,7 +165,7 @@ export default function App() {
         <section className="hero" aria-label="Bienvenida a Te Toca">
           <div className="eyebrow"><span className="eyebrow-dot" /> Una casa compartida, turnos claros</div>
           <h1>La casa funciona mejor cuando <em>todos participan.</em></h1>
-          <p className="hero-copy">Entrá con tu clave, encontrá tu habitación y descubrí qué te toca hacer hoy.</p>
+          <p className="hero-copy">Entrá con tu usuario, encontrá tu habitación y descubrí qué te toca hacer hoy.</p>
           <div className="house-art" aria-hidden="true">
             <div className="house-shadow" />
             <div className="house-roof" />
@@ -202,7 +190,7 @@ export default function App() {
             <div className="action-stack">
               <button className="primary-button" onClick={() => show('register')}>Crear mi perfil <span aria-hidden="true">↗</span></button>
               <button className="secondary-button" onClick={() => show('invited')}>Me invitaron a una casa <span aria-hidden="true">→</span></button>
-              <button className="text-button centered" onClick={() => show('login')}>Ya tengo mi clave personal</button>
+              <button className="text-button centered" onClick={() => show('login')}>Ya tengo una cuenta</button>
             </div>
           </div>}
 
@@ -210,32 +198,39 @@ export default function App() {
             <button className="back-button" onClick={() => show('welcome')} type="button">← Volver</button>
             <span className="step-label">{screen === 'invited' ? 'ME INVITARON' : 'PRIMER PASO'}</span>
             <h2>{screen === 'invited' ? 'Sumate a tu casa.' : 'Creá tu perfil.'}</h2>
-            <p>{screen === 'invited' ? 'Ingresá el código que te compartieron y elegí cómo querés aparecer.' : 'Elegí un nombre. Después vas a recibir tu clave personal para volver a entrar.'}</p>
+            <p>{screen === 'invited' ? 'Creá tu cuenta y usá el código que te compartieron.' : 'Un usuario y una contraseña. Así de simple.'}</p>
             <form onSubmit={submitRegister} className="form-stack">
-              <label>Tu nombre<input autoFocus autoComplete="nickname" maxLength={40} minLength={2} required placeholder="Por ejemplo, Charly" value={name} onChange={(event) => setName(event.target.value)} /></label>
+              <label>Usuario<input autoFocus autoComplete="username" autoCapitalize="none" spellCheck={false} minLength={3} maxLength={24} required placeholder="charly" value={username} onChange={event=>setUsername(event.target.value)} /></label>
+              <label>Contraseña<div className="password-field"><input type={showPassword?'text':'password'} autoComplete="new-password" minLength={6} maxLength={64} required placeholder="Al menos 6 caracteres" value={password} onChange={event=>setPassword(event.target.value)} /><button type="button" onClick={()=>setShowPassword(value=>!value)} aria-label={showPassword?'Ocultar contraseña':'Mostrar contraseña'}>{showPassword?'Ocultar':'Ver'}</button></div></label>
               {screen === 'invited' && <label>Código de la casa<input className="code-input" autoCapitalize="characters" autoComplete="off" required placeholder="ABCD-EFGH" value={inviteInput} onChange={(event) => setInviteInput(event.target.value)} /></label>}
               <button className="primary-button" disabled={busy}>{busy ? 'Un momento…' : screen === 'invited' ? 'Continuar' : 'Crear perfil'} <span aria-hidden="true">→</span></button>
             </form>
+            <button className="text-button centered" onClick={()=>{setPendingInvite(screen==='invited'?inviteInput:'');show('login')}}>Ya tengo una cuenta</button>
           </div>}
 
           {screen === 'login' && <div className="panel-content">
             <button className="back-button" onClick={() => show('welcome')} type="button">← Volver</button>
             <span className="step-label">BIENVENIDO DE NUEVO</span>
             <h2>Entrá a tu casa.</h2>
-            <p>Usá la clave personal que guardaste cuando creaste tu perfil.</p>
+            <p>Ingresá tu usuario y contraseña.</p>
             <form onSubmit={submitLogin} className="form-stack">
-              <label>Tu clave personal<input autoFocus className="code-input" autoCapitalize="characters" autoComplete="off" required placeholder="TT-XXXX-XXXX-XXXX-XXXX-XXXX" value={personalKey} onChange={(event) => setPersonalKey(event.target.value)} /></label>
+              <label>Usuario<input autoFocus autoComplete="username" autoCapitalize="none" spellCheck={false} minLength={3} maxLength={24} required placeholder="charly" value={username} onChange={event=>setUsername(event.target.value)} /></label>
+              <label>Contraseña<div className="password-field"><input type={showPassword?'text':'password'} autoComplete="current-password" minLength={6} maxLength={64} required placeholder="Tu contraseña" value={password} onChange={event=>setPassword(event.target.value)} /><button type="button" onClick={()=>setShowPassword(value=>!value)} aria-label={showPassword?'Ocultar contraseña':'Mostrar contraseña'}>{showPassword?'Ocultar':'Ver'}</button></div></label>
               <button className="primary-button" disabled={busy}>{busy ? 'Entrando…' : 'Entrar'} <span aria-hidden="true">→</span></button>
             </form>
+            <button className="text-button centered" onClick={()=>show('legacy-login')}>Tenía una cuenta con clave personal</button>
           </div>}
 
-          {screen === 'save-key' && <div className="panel-content">
-            <span className="step-label">TU CLAVE PERSONAL</span>
-            <h2>Guardá tu llave.</h2>
-            <p>La vas a necesitar para volver a entrar desde otro dispositivo. Esta clave se muestra una sola vez.</p>
-            <div className="code-card"><span>CLAVE DE {user?.display_name.toUpperCase()}</span><strong>{savedKey}</strong></div>
-            <button className="secondary-button" type="button" onClick={() => void copy(savedKey)}>{copied ? 'Copiada ✓' : 'Copiar clave'}</button>
-            <button className="primary-button" type="button" onClick={continueAfterKey} disabled={busy}>Ya guardé mi clave <span aria-hidden="true">→</span></button>
+          {screen === 'legacy-login' && <div className="panel-content">
+            <button className="back-button" onClick={()=>show('login')}>← Volver</button>
+            <h2>Conservá tu cuenta.</h2><p>Usá tu clave anterior una última vez para elegir un usuario y una contraseña.</p>
+            <form onSubmit={submitLegacy} className="form-stack"><label>Clave anterior<input autoFocus className="code-input" autoComplete="off" required value={personalKey} onChange={event=>setPersonalKey(event.target.value)} placeholder="TT-XXXX-XXXX-XXXX-XXXX-XXXX" /></label><button className="primary-button" disabled={busy}>{busy?'Entrando…':'Continuar'}</button></form>
+          </div>}
+
+          {screen === 'setup-credentials' && <div className="panel-content">
+            <h2>Elegí cómo entrar.</h2><p>Tu casa y tu personaje siguen acá. Elegí tu usuario y contraseña para volver a entrar.</p>
+            <form onSubmit={submitCredentials} className="form-stack"><label>Usuario<input autoFocus autoComplete="username" autoCapitalize="none" spellCheck={false} minLength={3} maxLength={24} required placeholder="charly" value={username} onChange={event=>setUsername(event.target.value)} /></label>
+              <label>Contraseña<div className="password-field"><input type={showPassword?'text':'password'} autoComplete="new-password" minLength={6} maxLength={64} required placeholder="Al menos 6 caracteres" value={password} onChange={event=>setPassword(event.target.value)} /><button type="button" onClick={()=>setShowPassword(value=>!value)} aria-label={showPassword?'Ocultar contraseña':'Mostrar contraseña'}>{showPassword?'Ocultar':'Ver'}</button></div></label><button className="primary-button" disabled={busy}>{busy?'Guardando…':'Guardar y continuar'}</button></form>
           </div>}
 
           {screen === 'choose-home' && <div className="panel-content">
@@ -268,18 +263,6 @@ export default function App() {
               <label>Código de la casa<input autoFocus className="code-input" autoCapitalize="characters" autoComplete="off" required placeholder="ABCD-EFGH" value={inviteInput} onChange={(event) => setInviteInput(event.target.value)} /></label>
               <button className="primary-button" disabled={busy}>{busy ? 'Uniéndote…' : 'Entrar a la casa'} <span aria-hidden="true">→</span></button>
             </form>
-          </div>}
-
-          {screen === 'home' && home && <div className="panel-content">
-            <span className="step-label">TU CASA</span>
-            <h2>{home.name}</h2>
-            <p>Ya estás adentro, {user?.display_name}. Acá vas a encontrar a todos y, en el próximo módulo, las tareas de cada habitación.</p>
-            <div className="member-list"><span>VIVEN ACÁ</span>{members.map((member) => <div className="member" key={member.id}><span className="member-avatar">{member.display_name[0].toUpperCase()}</span><span>{member.display_name}</span>{member.role === 'admin' && <small>Administra</small>}</div>)}</div>
-            {home.role === 'admin' && <div className="invite-section">
-              <h3>Invitá a alguien</h3><p>Compartí un código para que se una a la casa.</p>
-              <button className="secondary-button" onClick={generateInvite} disabled={busy}>{newInvite ? 'Generar otro código' : 'Generar código de invitación'}</button>
-              {newInvite && <><div className="code-card invite"><span>CÓDIGO DE LA CASA</span><strong>{newInvite}</strong><small>Vence el {new Date((inviteExpiry ?? 0) * 1000).toLocaleDateString('es-AR')}</small></div><button className="text-button" onClick={() => void copy(newInvite)}>{copied ? 'Copiado ✓' : 'Copiar código'}</button></>}
-            </div>}
           </div>}
 
           {error && <div className="error-message" role="alert">{error}</div>}

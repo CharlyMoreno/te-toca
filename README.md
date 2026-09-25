@@ -9,7 +9,7 @@ El jugador recorre una pequeña casa 3D con su avatar. En cada habitación encue
 La definición de pantallas, flujos y reglas de uso está en [la especificación funcional del MVP](docs/MVP_FUNCIONAL.md).
 El [modelo de datos](docs/DB_MODEL.md) documenta las migraciones de acceso, hogares, tareas y turnos.
 
-Estado: acceso, hogares, casa 3D, avatares, tareas recurrentes, turnos automáticos, finalización, deshacer e historial implementados. Los intercambios y la edición de rutinas siguen pendientes; el MVP completo todavía está en desarrollo. Te Toca es el nombre propuesto; su disponibilidad comercial y de dominio no fue verificada.
+Estado: acceso, hogares, casa 3D, presencia en tiempo real, editor de avatares, tareas recurrentes, turnos automáticos, finalización, deshacer e historial implementados. Los intercambios y la edición de rutinas siguen pendientes; el MVP completo todavía está en desarrollo. Te Toca es el nombre propuesto; su disponibilidad comercial y de dominio no fue verificada.
 
 ## Problema
 
@@ -78,16 +78,16 @@ Un hogar puede registrar sus integrantes, configurar tareas recurrentes y recorr
 
 - Registro cronológico de tareas completadas, con fecha y persona que las hizo.
 - Solicitudes de intercambio pendientes, aceptadas, rechazadas o canceladas.
-- Sin rankings ni puntuaciones entre integrantes.
+- Puntaje acumulado por integrante y total de la casa, con puntos configurables por tarea.
 
 ## Alcance funcional
 
 ### Hogar e integrantes
 
 - Un hogar activo por usuario en el MVP.
-- Acceso mediante una clave personal generada al crear el perfil, sin correo electrónico. La sesión se conserva durante 30 días.
+- Registro y acceso con usuario y contraseña, sin correo electrónico. La sesión se conserva durante 30 días.
 - Hasta seis integrantes, con nombre visible, color identificador y un avatar 3D simple.
-- La persona creadora administra el hogar, las invitaciones y las tareas.
+- La persona creadora administra el hogar, las invitaciones y las pausas de rutinas. Cualquier integrante puede crear tareas y asignarlas a una o varias personas de la casa.
 - Los demás integrantes consultan el hogar, completan sus tareas y gestionan sus intercambios.
 - Una invitación requiere un perfil con sesión iniciada y deja de permitir ingresos si se revoca, vence o se alcanza el límite de integrantes.
 - El hogar puede configurarse con una sola persona, pero la rotación compartida requiere al menos dos.
@@ -191,9 +191,9 @@ La combinación de tarea y fecha identifica de forma única cada ocurrencia. Las
 - **Hono + TypeScript en Cloudflare Workers** como API pública: sesiones, hogares, invitaciones, tareas, rotaciones, intercambios y permisos.
 - **Cloudflare D1** como base de datos SQL del hogar, integrantes, tareas, ocurrencias, intercambios e historial.
 - El mismo Worker accede a D1 mediante un binding, sin otra API entre ambos.
-- Acceso por clave personal y unión por código de casa; el Worker gestiona usuarios, sesiones y límites de intentos. No se requiere proveedor de correo.
+- Acceso por usuario y contraseña y unión por código de casa; el Worker gestiona usuarios, sesiones y límites de intentos. No se requiere proveedor de correo.
 - Operaciones atómicas de datos para generar ocurrencias y aceptar intercambios, con condiciones que impidan aplicar acciones duplicadas o vencidas.
-- Actualización de datos al abrir o volver a la aplicación y después de cada acción; la sincronización instantánea queda fuera del MVP.
+- **WebSockets + Durable Objects** para presencia y ubicación dentro del juego, con un canal privado por casa. Las mutaciones notifican a los clientes conectados para que actualicen tareas, integrantes y avatares desde la API.
 
 El recorrido de datos es **navegador → API Hono en un Worker → D1**. La lógica de tareas y rotaciones será independiente de la escena 3D. El MVP requiere conexión; si una operación falla, la interfaz informa el error y permite reintentar sin mostrarla como completada.
 
@@ -203,7 +203,7 @@ React, Three.js, React Three Fiber, Drei y Hono ya están instalados. La escena 
 
 ## Despliegue en Cloudflare
 
-La propuesta es publicar el cliente con Workers Static Assets y la API Hono en el mismo Worker, con Cloudflare D1 para persistencia y entornos separados de pruebas y producción. El acceso usa claves personales y códigos de casa, sin proveedor de correo. R2 queda como componente opcional.
+La propuesta es publicar el cliente con Workers Static Assets y la API Hono en el mismo Worker, con Cloudflare D1 para persistencia y entornos separados de pruebas y producción. El acceso usa usuario y contraseña; las invitaciones siguen usando códigos de casa, sin proveedor de correo. R2 queda como componente opcional.
 
 El análisis, las decisiones de arquitectura, el plan de publicación y la recuperación están documentados en [la propuesta de infraestructura](docs/INFRAESTRUCTURA.md). La infraestructura todavía no está provisionada.
 
@@ -222,19 +222,70 @@ npm run dev
 ### Usar la casa 3D
 
 1. Abrí la dirección que imprime Vite al ejecutar `npm run dev`.
-2. Entrá con tu clave personal o creá un perfil y una casa.
+2. Entrá con tu usuario y contraseña o creá un perfil y una casa.
 3. Usá **Nueva tarea** para elegir habitación, objeto, frecuencia, fecha inicial y participantes de la rotación.
 4. Tocá una habitación: la cámara se acerca y tu avatar camina hasta ella. Arrastrá para girar la cámara; usá la rueda o un pellizco para acercar. **Ver toda la casa** restablece la vista.
 5. Tocá los objetos para abrir su tarea. **Ya la hice** guarda la finalización, retira el objeto y anima al avatar. Hay diez segundos para deshacer.
 6. Elegí un integrante para filtrar sus pendientes; consultá **Hechas**, **Próximas** e **Historial** para ver el resto.
 
-La escena usa modelos geométricos propios, sin descargas de modelos externos. Muestra hasta seis objetos pendientes por habitación; todas las ocurrencias están disponibles en la lista. Los demás avatares resumen progreso, sin indicar presencia en línea ni ubicación real. Los datos se actualizan al volver a la pestaña y después de cada acción.
+La escena usa modelos geométricos propios, sin descargas de modelos externos. Muestra hasta seis objetos pendientes por habitación; todas las ocurrencias están disponibles en la lista. Los avatares conectados muestran la habitación que visitan en el juego; la lista de integrantes también conserva a quienes están desconectados. Los datos se actualizan por avisos del servidor, al reconectar, al volver a la pestaña y después de cada acción.
 
-**Vista simple** permite usar las habitaciones sin 3D. La navegación por botones y listas funciona con teclado; las animaciones respetan la preferencia de movimiento reducido. La celebración actual es un salto breve; las animaciones específicas de limpieza por objeto quedan pendientes.
+**Vista simple** permite usar las habitaciones sin 3D. La navegación por botones y listas funciona con teclado; las animaciones respetan la preferencia de movimiento reducido. La celebración incluye salto, giro, brazos levantados, confeti y puntos flotantes. Los objetos reaccionan según su tipo: burbujas en platos, barrido de escoba, elevación de basura y giro de ropa. Los retos muestran un gesto de sorpresa y un aviso sobre el avatar.
 
 Pausar una rutina detiene la generación de turnos nuevos; los ya generados permanecen. Por ahora no hay edición ni reactivación desde la interfaz.
 
-El entorno local usa una base D1 simulada. Para desplegar, se debe crear la base D1 real, reemplazar el `database_id` de ejemplo en `wrangler.jsonc`, aplicar las migraciones remotas y publicar el Worker. Ninguna clave personal ni código de casa se guarda en texto legible: solo se almacenan sus hashes. La clave personal se muestra una vez al crear el perfil; si se pierde y la sesión vence, esta primera versión no puede recuperar la cuenta.
+El entorno local usa una base D1 simulada. Para desplegar, se debe crear la base D1 real, reemplazar el `database_id` de ejemplo en `wrangler.jsonc`, aplicar las migraciones remotas y publicar el Worker. Las contraseñas se guardan como hashes bcrypt con salt; las cookies y los códigos de casa se guardan mediante hashes SHA-256. No hay recuperación por correo en esta versión.
+
+## Tareas compartidas, puntos y retos
+
+Todos los integrantes pueden crear tareas. Elegir un participante asigna sus turnos a esa persona; elegir varios genera una rotación. La administración conserva el permiso para pausar rutinas y generar invitaciones.
+
+Cada tarea tiene entre **5 y 100 puntos**, con 10 como valor inicial. Al generar una ocurrencia se copia su valor. El tablero **Puntajes** suma todas las ocurrencias completadas por persona, sin limitarse a las visibles en los últimos treinta días. Completar dos veces no duplica puntos; deshacer quita el aporte de esa ocurrencia. La migración asigna 10 puntos también a las tareas y ocurrencias existentes, incluidas las ya completadas.
+
+El socket de la casa entrega eventos `task.created`, `task.completed`, `task.undone` y `task.nudged`. Una tarea nueva muestra un aviso a los conectados y actualiza la lista, los objetos y los próximos turnos, según su fecha. Los puntos y las celebraciones también se comparten. Reconectar recupera los datos actuales desde D1; las animaciones son transitorias y no se reproducen como historial.
+
+**Retar con onda** aparece en pendientes de otra persona con fecha de hoy o anterior. Envía un recordatorio y muestra una reacción sobre el avatar. El servidor impone cinco minutos entre recordatorios de la misma ocurrencia para toda la casa, valida el responsable y rechaza tareas hechas, futuras o ajenas al hogar. Los retos no descuentan puntos. Si el destinatario está desconectado, el aviso queda guardado y aparece en sus pendientes al volver; el avatar temporal se identifica como desconectado.
+
+La casa ocupa el área completa de la pantalla. Una interfaz mínima de juego flota sobre la escena: nombre de casa, conexión, puntos y menú arriba; habitaciones y dos acciones (crear y ver tareas) abajo. **Tareas** abre o cierra el panel, que comienza cerrado en todos los dispositivos. El menú superior reúne personaje, integrantes, puntajes, historial, rutinas y vista simple. La barra inferior sirve para cambiar de habitación; los avatares muestran solo el nombre y su estado de conexión, con detalles al seleccionarlos. Los botones y las listas siguen disponibles en la vista simple y con teclado.
+
+Aplicar `npm run db:migrate:local` incorpora `0004_points_nudges.sql`.
+
+## Registro y login
+
+Solo se piden **usuario y contraseña**. El usuario tiene de 3 a 24 caracteres (letras, números, punto, guion y guion bajo), es único y no distingue mayúsculas. La contraseña tiene de 6 a 64 caracteres, hasta 72 bytes UTF-8, sin reglas de mayúsculas o símbolos ni campo de confirmación. El usuario se usa como nombre visible al crear el perfil.
+
+`user_credentials` guarda el usuario normalizado y un hash **bcrypt con costo 12 y salt aleatorio**. Nunca se devuelve ni se guarda la contraseña original. Se mantienen cookies `HttpOnly`, límites de intentos por IP y usuario y errores genéricos al fallar el login. La implementación utiliza [bcrypt.js](https://github.com/dcodeIO/bcrypt.js); el salt y el factor de trabajo quedan incorporados al hash.
+
+Las cuentas previas conservan todos sus datos. Si tienen una sesión abierta, se les pide elegir credenciales una vez. Si solo conservan su clave personal, el enlace **Tenía una cuenta con clave personal** permite usarla para configurar usuario y contraseña. Al hacerlo se revocan sus claves anteriores. No se asignan contraseñas por defecto.
+
+Aplicar `npm run db:migrate:local` incorpora `0005_password_login.sql`. El Worker usa `nodejs_compat` para la dependencia de hashing. Para producción, contemplar el tiempo de CPU del hashing en el plan de Workers; bcrypt con este costo puede exceder el presupuesto de CPU del plan gratuito. La publicación remota todavía no está configurada.
+
+## Presencia y personajes
+
+**Mi personaje** abre un editor con vista 3D giratoria: seis tonos de piel, cinco peinados (corto, rulos, largo, rodete y sin pelo), siete colores de pelo y remera, cuatro colores de pantalón y anteojos. La apariencia se guarda en D1 al confirmar y se comparte con la casa. Cerrar el editor sin guardar descarta el borrador.
+
+Al entrar, el navegador abre `/api/presence` con su cookie de sesión. El Worker determina el hogar y lo conecta a su instancia `HousePresence` mediante el binding `HOUSE_PRESENCE`. No acepta identidades ni hogares elegidos por el cliente. Los avatares caminan hasta la habitación seleccionada también en las pantallas de los demás. Es presencia dentro del juego, sin geolocalización.
+
+- **En línea:** una pestaña visible mantiene la conexión.
+- **Ausente:** la conexión sigue abierta, pero la pestaña está oculta.
+- **Desconectado:** no hay conexiones vigentes de ese integrante.
+- Una persona con varias pestañas aparece una sola vez; se prioriza la pestaña visible con el movimiento más reciente.
+- Al perder red se borra el listado de presencia y se muestra la reconexión. Los latidos son cada veinte segundos; una conexión abandonada se descarta tras setenta segundos, en la siguiente revisión de treinta segundos. Las sesiones se revalidan en esas revisiones.
+- Los cambios de tareas y apariencia se guardan primero por HTTP en D1. Después, un aviso por socket hace que los clientes consulten nuevamente los datos autorizados. No se completan tareas mediante mensajes de socket.
+
+### Reacciones de personaje
+
+Al hacer clic en un personaje aparece un menú con **😡 enojarme, 🖕 fuck you, 👍 like y ❤️ corazón**, además de acceso a sus tareas. El emoji elegido flota sobre el avatar de quien lo envía, incluso si hizo clic en otro integrante. Todos los conectados de esa casa ven la reacción durante unos tres segundos. Los personajes siguen sin cambiar su puntaje por reaccionar.
+
+La identidad se obtiene de la sesión del socket, el destinatario se valida dentro del hogar y se aceptan únicamente los cuatro emojis del catálogo. Las reacciones tienen un intervalo mínimo de 1,5 segundos por conexión. Son eventos temporales; no se guardan ni se reproducen al reconectar. Movimiento reducido muestra el emoji sin desplazamiento.
+
+### Configuración
+
+Ejecutá `npm run db:migrate:local` para aplicar `0003_avatars.sql` y reiniciá `npm run dev` si estaba abierto antes de agregar el binding. Wrangler configura el Durable Object local automáticamente. Para publicar, además de las migraciones de D1, el despliegue incluye la migración `v1-house-presence` de `wrangler.jsonc`. La infraestructura remota sigue pendiente de provisionar.
+
+Para usarlo entre dos personas en local, abrí la URL en dos perfiles de navegador (por ejemplo, ventana normal e incógnito), creá dos cuentas y unilas mediante el código de la misma casa. Cada una puede elegir su personaje y habitación. Dos pestañas con la misma cookie representan a la misma persona.
+
+La presencia usa la [API de WebSockets con hibernación de Cloudflare](https://developers.cloudflare.com/durable-objects/best-practices/websockets/). El estado temporal de conexión vive en los attachments del Durable Object; la apariencia persistente vive en D1.
 
 ## Fuera del MVP
 
@@ -243,11 +294,11 @@ El entorno local usa una base D1 simulada. Para desplegar, se debe crear la base
 - Chat, comentarios, archivos o fotos como comprobante.
 - Minijuegos por tarea, física, combate, monedas y niveles. El juego inicial consiste en recorrer, interactuar y transformar visualmente la casa al registrar tareas reales.
 - Notificaciones push, recordatorios externos e integraciones con calendarios.
-- Puntos, premios, castigos, rankings o medición de productividad personal.
+- Premios materiales, descuentos automáticos de puntos por atrasos y estadísticas de productividad personal. El puntaje lúdico por tareas sí está incluido.
 - Reparto según esfuerzo, disponibilidad, vacaciones o inteligencia artificial.
 - Frecuencias mensuales, intervalos personalizados y tareas de una sola vez.
 - Transferir una tarea sin intercambio, o intercambiar cadenas de más de dos turnos.
-- Editor detallado de casas y avatares, y decoración desbloqueable.
+- Editor de casas, modelos de avatar subidos por usuarios y decoración desbloqueable. La personalización básica del personaje sí está incluida.
 - Compras compartidas, gastos, pagos o suscripciones.
 
 ## Criterios de aceptación

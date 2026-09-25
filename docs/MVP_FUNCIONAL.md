@@ -1,3 +1,5 @@
+> Acceso actualizado: registro y login con usuario y contraseña, sin correo. Las referencias a claves personales en el diseño inicial de abajo solo aplican a la transición de cuentas anteriores; el flujo actual está documentado en el README. Las invitaciones por código permanecen iguales.
+
 # Te Toca — definición funcional del MVP
 
 ## Qué tiene que lograr el usuario
@@ -10,14 +12,14 @@ El producto se organiza alrededor de una **ocurrencia**: una tarea concreta en u
 
 - Un hogar por cuenta, pensado para 2 a 6 integrantes. Puede tener una sola persona mientras se aceptan las invitaciones.
 - Cuatro habitaciones predefinidas: cocina, baño, dormitorio y zona común.
-- Un avatar 3D simple por integrante activo, asociado a su nombre y color.
+- Un avatar 3D personalizable por integrante: piel, pelo, peinado, ropa y anteojos. Presencia en tiempo real y habitación visitada dentro del juego.
 - Tareas diarias o semanales, con una persona responsable en cada fecha.
 - Rotación circular entre los participantes seleccionados para cada tarea.
 - Intercambio de dos ocurrencias pendientes, sujeto a aceptación.
 - Historial de tareas completadas e intercambios.
 - Aplicación web adaptable a móvil y escritorio.
 
-La casa 3D permite un recorrido guiado entre habitaciones mediante clic, toque o controles visibles. El avatar propio camina por rutas definidas y la cámara lo acompaña. Los avatares de las otras personas muestran su progreso; no representan su ubicación física en tiempo real.
+La casa 3D permite un recorrido guiado entre habitaciones mediante clic, toque o controles visibles. El avatar propio camina por rutas definidas y la cámara lo acompaña. Los avatares de las otras personas conectadas muestran su progreso y caminan a la habitación que seleccionan en el juego. La lista distingue conexión activa, pestaña ausente y desconexión.
 
 ## Flujo completo
 
@@ -57,13 +59,13 @@ Recibir código de casa → Crear perfil o entrar con clave personal
 - Se crea como administradora y ve una casa vacía con la acción «Agregar primera tarea».
 - Puede generar un código de ocho caracteres, compartirlo por el medio que prefiera y regenerarlo para invalidar el anterior. El código vence a los siete días.
 - Al ingresar un código válido, el invitado pasa a ser integrante activo y aparece en la casa.
-- Cada integrante activo tiene un avatar 3D sencillo con nombre y color identificador. El color se elige al crear su perfil y puede cambiarse después.
+- Cada integrante tiene un avatar 3D. Desde «Mi personaje» puede elegir piel, pelo, peinado, remera, pantalón y anteojos, previsualizarlo y guardar. El cambio se comparte con los demás integrantes.
 - La administradora puede copiar el código recién generado o revocarlo al generar uno nuevo.
 - Se muestran los integrantes activos. No se crean participantes pendientes hasta que ingresan con el código.
 - Solo los integrantes activos pueden formar parte de una rotación y asumir tareas.
 - Una cuenta no puede aceptar una invitación de otra casa mientras pertenezca a una.
 
-Para simplificar el primer lanzamiento, el administrador configura tareas e invitaciones; cualquier integrante puede ver tareas, completar las propias y gestionar intercambios.
+Todos los integrantes pueden crear y asignar tareas dentro de su casa. El administrador gestiona invitaciones y pausas de rutinas. Cada persona completa las propias; el flujo de intercambios sigue pendiente de implementación.
 
 **Estados:** código inválido, vencido o revocado; cupo de seis integrantes alcanzado; usuario ya integrante de una casa.
 
@@ -72,7 +74,7 @@ Para simplificar el primer lanzamiento, el administrador configura tareas e invi
 **Qué hace:** organiza las tareas espacialmente. La habitación es la pantalla donde se consultan y resuelven sus pendientes.
 
 - La vista inicial muestra una casa abierta con las cuatro habitaciones.
-- Los avatares de los integrantes activos aparecen en un espacio común de la vista general. Cada uno muestra su nombre y un indicador de tareas de hoy completadas, pendientes y atrasadas.
+- Los avatares de los integrantes conectados aparecen en la casa y se mueven a la habitación que visitan. Cada uno muestra su nombre, estado de conexión y tareas de hoy completadas, pendientes y atrasadas. Las personas desconectadas siguen disponibles en el listado.
 - Al seleccionar un avatar, se abre una tarjeta con sus tareas de hoy, las atrasadas y las hechas hoy; además, se resaltan las habitaciones donde tiene pendientes.
 - Cuando alguien completa una tarea, su indicador y la habitación correspondiente se actualizan para todos los integrantes al volver a consultar los datos.
 - Cada habitación indica cuántas tareas pendientes tiene el integrante y cuántas tiene el hogar. Así se sabe adónde ir antes de entrar.
@@ -108,7 +110,7 @@ Formulario mínimo:
 | Primera fecha | Define el inicio; en la semanal también define el día de la semana |
 | Participantes | Uno o más integrantes activos, en el orden de rotación |
 
-- La administradora puede crear, editar y pausar una tarea.
+- Cualquier integrante puede crear y asignar tareas; la administradora puede pausarlas. La edición sigue pendiente.
 - Se pueden usar plantillas editables para las tareas comunes, sin agregarlas automáticamente.
 - Antes de guardar se muestra una vista previa de los tres turnos siguientes.
 - Los cambios de frecuencia o participantes se aplican a las próximas ocurrencias aún no generadas. Las existentes conservan su asignación.
@@ -161,7 +163,7 @@ Dentro de cada habitación se puede alternar entre **Mis tareas** y **Todas**. L
 - Registro de intercambios aceptados, con ambas personas y tareas involucradas.
 - Registro de deshacer una finalización.
 - Filtros sencillos por integrante y mes.
-- Sin puntajes, rankings ni estadísticas de rendimiento en el MVP.
+- Puntaje por persona y total de la casa: de 5 a 100 puntos por tarea, sumados al completarla y revertidos al deshacer. Los retos no descuentan puntos.
 
 ## Pantallas y elementos de interfaz
 
@@ -200,7 +202,7 @@ En móvil y escritorio, se entra primero a la casa. Al elegir una habitación se
 
 ## Qué queda fuera
 
-- Editor detallado de casas o avatares, movimiento libre en primera persona y presencia en tiempo real.
+- Editor detallado de casas, modelos de avatar subidos por usuarios y movimiento libre en primera persona. Se incluyen personalización básica y presencia en tiempo real por habitación.
 - Minijuegos por tarea, física, monedas y niveles. La primera mecánica jugable es recorrer habitaciones e interactuar con tareas reales.
 - Notificaciones push, recordatorios por correo y chat.
 - Tareas mensuales, tareas únicas y horarios límite configurables.
@@ -208,7 +210,7 @@ En móvil y escritorio, se entra primero a la casa. Al elegir una habitación se
 - Varios hogares por cuenta, cambio de administrador y eliminación de integrantes.
 - Recuperación de cuentas sin clave personal ni sesión activa.
 - Tareas compartidas que requieren varias personas al mismo tiempo.
-- Fotos como prueba, puntos, premios y castigos.
+- Fotos como prueba, premios materiales y descuentos de puntos como castigo.
 
 ## Orden recomendado de construcción
 
@@ -219,3 +221,15 @@ En móvil y escritorio, se entra primero a la casa. Al elegir una habitación se
 5. Casa 3D, recorrido guiado del avatar propio, avatares con progreso y reacción visual de las habitaciones.
 
 El paso 3 sirve para comprobar las reglas de tareas y rotación. La experiencia completa del MVP requiere los cinco pasos, incluido el recorrido por las habitaciones.
+
+## Ampliación: tareas en vivo y reacciones
+
+- Crear, completar, deshacer o recordar una tarea emite un evento al canal privado del hogar. Las pantallas conectadas actualizan la lista y el puntaje desde D1.
+- El valor de puntos se copia a la ocurrencia al generarla. El tablero incluye el historial completo de tareas completadas; las ocurrencias previas a esta ampliación valen diez puntos.
+- «Retar con onda» recuerda una tarea pendiente actual o atrasada de otra persona. Hay un plazo de cinco minutos entre recordatorios de la misma ocurrencia, compartido por toda la casa. El aviso queda disponible al destinatario aunque estuviera desconectado.
+- La casa llena la pantalla y los controles flotan sobre el 3D. El panel de tareas comienza cerrado. El HUD muestra casa, conexión, puntos y menú arriba; habitaciones y crear/ver tareas abajo. Personaje, integrantes, historial, rutinas y vista simple se consultan desde el menú.
+- Completar muestra salto, giro, brazos levantados, confeti y puntos flotantes. Los objetos tienen reacciones según su tipo; un reto provoca sorpresa y un globo de aviso. Movimiento reducido conserva los mensajes y evita las animaciones.
+
+## Reacciones sobre personajes
+
+Hacer clic en un personaje abre las acciones 😡 enojarme, 🖕 fuck you, 👍 like y ❤️ corazón. El emoji aparece sobre el avatar de quien reacciona y se comparte con los conectados del hogar. Dura unos tres segundos, no modifica puntos y no queda como historial. El menú también permite consultar las tareas del personaje seleccionado.

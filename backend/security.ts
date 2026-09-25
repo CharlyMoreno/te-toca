@@ -16,10 +16,6 @@ export function code(length: number): string {
   return Array.from(bytes, (value) => alphabet[value % alphabet.length]).join('')
 }
 
-export function personalCode(): string {
-  return `TT-${code(20).match(/.{4}/g)!.join('-')}`
-}
-
 export function inviteCode(): string {
   return code(8).match(/.{4}/g)!.join('-')
 }
@@ -86,11 +82,12 @@ export const requireUser = createMiddleware<AppEnv>(async (c, next) => {
   const raw = getCookie(c, sessionCookie)
   if (!raw) return c.json({ error: 'Necesitás entrar a tu cuenta.' }, 401)
 
+  const sessionHash = await hash(raw)
   const user = await c.env.DB.prepare(`
     SELECT u.id, u.display_name
     FROM sessions s JOIN users u ON u.id = s.user_id
     WHERE s.token_hash = ? AND s.expires_at > ?
-  `).bind(await hash(raw), now()).first<User>()
+  `).bind(sessionHash, now()).first<User>()
 
   if (!user) {
     deleteCookie(c, sessionCookie, { path: '/' })
@@ -98,5 +95,6 @@ export const requireUser = createMiddleware<AppEnv>(async (c, next) => {
   }
 
   c.set('user', user)
+  c.set('sessionHash', sessionHash)
   await next()
 })

@@ -6,8 +6,10 @@ export type User = {
 export type AppEnv = {
   Bindings: {
     DB: D1Database
+    HOUSE_PRESENCE: DurableObjectNamespace
   }
   Variables: {
     user: User
+    sessionHash: string
   }
 }

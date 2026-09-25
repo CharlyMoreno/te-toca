@@ -1,3 +1,4 @@
+import { parseAvatar } from '../shared/avatar'
 import { Hono } from 'hono'
 import { clientIp, hash, inviteCode, limit, normalizeCode, now, requireUser } from './security'
 import type { AppEnv } from './types'
@@ -25,11 +26,11 @@ homes.get('/current', async (c) => {
   if (!home) return c.json({ home: null, members: [] })
 
   const members = await c.env.DB.prepare(`
-    SELECT u.id, u.display_name, m.role
+    SELECT u.id, u.display_name, m.role, u.avatar_json
     FROM home_members m JOIN users u ON u.id = m.user_id
     WHERE m.home_id = ? ORDER BY m.joined_at, u.id
-  `).bind(home.id).all<{ id: string; display_name: string; role: string }>()
-  return c.json({ home, members: members.results })
+  `).bind(home.id).all<{ id: string; display_name: string; role: string; avatar_json: string }>()
+  return c.json({ home, members: members.results.map(({ avatar_json, ...person }) => ({ ...person, avatar: parseAvatar(avatar_json) })) })
 })
 
 homes.post('/', async (c) => {

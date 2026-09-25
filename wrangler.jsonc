@@ -5,7 +5,9 @@
   "main": "./backend/index.ts",
   "assets": {
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*"]
+    "run_worker_first": [
+      "/api/*"
+    ]
   },
   "d1_databases": [
     {
@@ -14,5 +16,24 @@
       "database_id": "00000000-0000-0000-0000-000000000000",
       "migrations_dir": "./backend/migrations"
     }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "HOUSE_PRESENCE",
+        "class_name": "HousePresence"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1-house-presence",
+      "new_sqlite_classes": [
+        "HousePresence"
+      ]
+    }
+  ],
+  "compatibility_flags": [
+    "nodejs_compat"
   ]
 }

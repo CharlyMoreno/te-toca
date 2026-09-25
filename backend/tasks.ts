@@ -1,3 +1,6 @@
+import type { Context } from 'hono'
+import type { GameEvent } from '../shared/game'
+import { publishGameEvent } from './realtime'
 import { Hono } from 'hono'
 import { now, requireUser } from './security'
 import type { AppEnv } from './types'
@@ -18,7 +21,7 @@ function dateString(day: number) { return new Date(day * 86400000).toISOString()
 async function materialize(db: D1Database, home: Membership) {
   const routines = await db.prepare(`SELECT t.*, MAX(o.due_date) last_date FROM tasks t
     LEFT JOIN task_occurrences o ON o.task_id=t.id WHERE t.home_id=? AND t.active=1 GROUP BY t.id`)
-    .bind(home.id).all<{ id: string; frequency: string; first_date: string; last_date: string | null }>()
+    .bind(home.id).all<{ id: string; frequency: string; first_date: string; points: number; last_date: string | null }>()
   const participants = await db.prepare(`SELECT p.* FROM task_participants p JOIN tasks t ON t.id=p.task_id
     WHERE t.home_id=? ORDER BY p.position`).bind(home.id).all<{ task_id: string; user_id: string }>()
   const end = dayNumber(dateInZone(home.timezone)) + 7
@@ -33,8 +36,8 @@ async function materialize(db: D1Database, home: Membership) {
       const date = dateString(day)
       const assigned = people[((day - first) / interval) % people.length].user_id
       statements.push(db.prepare(`INSERT OR IGNORE INTO task_occurrences
-        (id,task_id,due_date,original_assignee,assignee) VALUES (?,?,?,?,?)`)
-        .bind(`${routine.id}:${date}`, routine.id, date, assigned, assigned))
+        (id,task_id,due_date,original_assignee,assignee,points) VALUES (?,?,?,?,?,?)`)
+        .bind(`${routine.id}:${date}`, routine.id, date, assigned, assigned, routine.points))
       if (statements.length === 50) { await db.batch(statements); statements = [] }
     }
   }
@@ -49,16 +52,21 @@ tasks.get('/', async c => {
   if (!home) return c.json({ error: 'Primero necesitás una casa.' }, 404)
   await materialize(c.env.DB, home)
   const today = dateInZone(home.timezone)
-  const result = await c.env.DB.prepare(`SELECT o.*,t.title,t.room,t.icon,t.frequency,t.active FROM task_occurrences o
-    JOIN tasks t ON t.id=o.task_id WHERE t.home_id=? AND (o.completed_at IS NULL OR o.completed_at>?)
+  const result = await c.env.DB.prepare(`SELECT o.*,t.title,t.room,t.icon,t.frequency,t.active,n.created_at nudged_at,n.actor_id nudged_by FROM task_occurrences o
+    JOIN tasks t ON t.id=o.task_id LEFT JOIN task_nudges n ON n.occurrence_id=o.id WHERE t.home_id=? AND (o.completed_at IS NULL OR o.completed_at>?)
     ORDER BY o.due_date,t.title`).bind(home.id, now() - 30 * 86400).all()
   const routines = await c.env.DB.prepare('SELECT * FROM tasks WHERE home_id=? ORDER BY created_at DESC').bind(home.id).all()
-  return c.json({ occurrences: result.results, routines: routines.results, today })
+  const scores = await c.env.DB.prepare(`SELECT m.user_id userId,
+    COALESCE(SUM(o.points),0) points, COUNT(o.id) completed FROM home_members m
+    LEFT JOIN (task_occurrences o JOIN tasks t ON t.id=o.task_id)
+      ON o.completed_by=m.user_id AND o.completed_at IS NOT NULL AND t.home_id=m.home_id
+    WHERE m.home_id=? GROUP BY m.user_id ORDER BY points DESC,m.user_id`).bind(home.id).all()
+  return c.json({ occurrences: result.results, routines: routines.results, scores: scores.results, today })
 })
 
 tasks.post('/', async c => {
   const home = await membership(c.env.DB, c.get('user').id)
-  if (!home || home.role !== 'admin') return c.json({ error: 'Solo quien administra puede crear tareas.' }, 403)
+  if (!home) return c.json({ error: 'Primero necesitás una casa.' }, 403)
   const data = await c.req.json().catch(() => null) as Record<string, unknown> | null
   const title = typeof data?.title === 'string' ? data.title.trim() : ''
   const room = typeof data?.room === 'string' ? data.room : ''
@@ -66,8 +74,9 @@ tasks.post('/', async c => {
   const frequency = typeof data?.frequency === 'string' ? data.frequency : ''
   const firstDate = typeof data?.firstDate === 'string' ? data.firstDate : ''
   const people = Array.isArray(data?.participants) ? data.participants : []
+  const points = data?.points ?? 10
   const today = dateInZone(home.timezone)
-  if (title.length < 2 || title.length > 80 || !['kitchen','bathroom','bedroom','living'].includes(room)
+  if (typeof points !== 'number' || !Number.isInteger(points) || points < 5 || points > 100 || title.length < 2 || title.length > 80 || !['kitchen','bathroom','bedroom','living'].includes(room)
     || !['dishes','trash','clean','laundry'].includes(icon) || !['daily','weekly'].includes(frequency)
     || !/^\d{4}-\d{2}-\d{2}$/.test(firstDate) || !Number.isFinite(dayNumber(firstDate))
     || dateString(dayNumber(firstDate)) !== firstDate || firstDate < today || dayNumber(firstDate) > dayNumber(today) + 365
@@ -78,11 +87,15 @@ tasks.post('/', async c => {
   if (people.some(p => !members.results.some(m => m.user_id === p))) return c.json({ error: 'Los participantes deben pertenecer a la casa.' }, 400)
   const id = crypto.randomUUID()
   await c.env.DB.batch([
-    c.env.DB.prepare('INSERT INTO tasks (id,home_id,title,room,icon,frequency,first_date,created_at) VALUES (?,?,?,?,?,?,?,?)')
-      .bind(id, home.id, title, room, icon, frequency, firstDate, now()),
+    c.env.DB.prepare('INSERT INTO tasks (id,home_id,title,room,icon,frequency,first_date,created_at,points) VALUES (?,?,?,?,?,?,?,?,?)')
+      .bind(id, home.id, title, room, icon, frequency, firstDate, now(), points),
     ...people.map((p, index) => c.env.DB.prepare('INSERT INTO task_participants (task_id,user_id,position) VALUES (?,?,?)').bind(id, p, index)),
   ])
-  return c.json({ id }, 201)
+  const event: GameEvent = { id: crypto.randomUUID(), kind: 'task.created', actorId: c.get('user').id,
+    actorName: c.get('user').display_name, targetId: people[0] as string, occurrenceId: `${id}:${firstDate}`,
+    title, room: room as GameEvent['room'], points: points as number, createdAt: now() }
+  broadcast(c, home.id, event)
+  return c.json({ id, event }, 201)
 })
 
 tasks.post('/:id/complete', async c => {
@@ -100,7 +113,9 @@ tasks.post('/:id/complete', async c => {
       SELECT ?,?,id,?,'completed',? FROM task_occurrences WHERE id=? AND action_key=?`).bind(key,home.id,user.id,timestamp,id,key),
   ])
   if (!result[0].meta.changes) return c.json({ error: 'La tarea cambió, todavía no vence o no está asignada a vos.' }, 409)
-  return c.json({ ok: true, completedAt: timestamp })
+  const event = await occurrenceEvent(c, id, key, 'task.completed')
+  broadcast(c, home.id, event)
+  return c.json({ ok: true, completedAt: timestamp, event })
 })
 
 tasks.post('/:id/undo', async c => {
@@ -116,7 +131,9 @@ tasks.post('/:id/undo', async c => {
       SELECT ?,?,id,?,'undone',? FROM task_occurrences WHERE id=? AND action_key=?`).bind(key,home.id,user.id,timestamp,id,key),
   ])
   if (!result[0].meta.changes) return c.json({ error: 'Ya pasó el tiempo para deshacer.' }, 409)
-  return c.json({ ok: true })
+  const event = await occurrenceEvent(c, id, key, 'task.undone')
+  broadcast(c, home.id, event)
+  return c.json({ ok: true, event })
 })
 
 tasks.post('/:id/pause', async c => {
@@ -135,4 +152,32 @@ tasks.get('/history', async c => {
     JOIN tasks t ON t.id=o.task_id JOIN users u ON u.id=e.actor_id
     WHERE e.home_id=? ORDER BY e.created_at DESC,e.rowid DESC LIMIT 100`).bind(home.id).all()
   return c.json({ events: result.results })
+})
+
+function broadcast(c: Context<AppEnv>, homeId: string, event: GameEvent) {
+  c.executionCtx.waitUntil(publishGameEvent(c.env, homeId, event).catch(error => console.error('Game event failed', error)))
+}
+async function occurrenceEvent(c: Context<AppEnv>, id: string, eventId: string, kind: GameEvent['kind']): Promise<GameEvent> {
+  const row = await c.env.DB.prepare(`SELECT o.assignee targetId,t.title,t.room,o.points
+    FROM task_occurrences o JOIN tasks t ON t.id=o.task_id WHERE o.id=?`)
+    .bind(id).first<{targetId:string;title:string;room:GameEvent['room'];points:number}>()
+  if (!row) throw new Error('Occurrence not found after mutation')
+  return { ...row, id: eventId, kind, actorId: c.get('user').id, actorName: c.get('user').display_name, occurrenceId: id, createdAt: now() }
+}
+
+tasks.post('/:id/nudge', async c => {
+  const user = c.get('user'), home = await membership(c.env.DB, user.id)
+  if (!home) return c.json({ error: 'Primero necesitás una casa.' }, 403)
+  const occurrenceId = c.req.param('id'), id = crypto.randomUUID(), timestamp = now()
+  // A household-wide five-minute cooldown per occurrence, checked atomically with task eligibility.
+  const result = await c.env.DB.prepare(`INSERT INTO task_nudges (occurrence_id,id,actor_id,target_id,created_at)
+    SELECT o.id,?,?,o.assignee,? FROM task_occurrences o JOIN tasks t ON t.id=o.task_id
+    WHERE o.id=? AND t.home_id=? AND o.completed_at IS NULL AND o.assignee<>? AND o.due_date<=?
+    ON CONFLICT(occurrence_id) DO UPDATE SET id=excluded.id,actor_id=excluded.actor_id,
+      target_id=excluded.target_id,created_at=excluded.created_at WHERE task_nudges.created_at<=?`)
+    .bind(id,user.id,timestamp,occurrenceId,home.id,user.id,dateInZone(home.timezone),timestamp-300).run()
+  if (!result.meta.changes) return c.json({ error: 'Solo podés recordar pendientes de otra persona. Si ya hubo un reto, esperá cinco minutos.' }, 409)
+  const event = await occurrenceEvent(c, occurrenceId, id, 'task.nudged')
+  broadcast(c, home.id, event)
+  return c.json({ ok: true, event })
 })

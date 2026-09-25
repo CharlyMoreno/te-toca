@@ -1,4 +1,7 @@
 import { Hono } from 'hono'
+import { profile } from './profile'
+import { presence, notifyHouse } from './presence'
+export { HousePresence } from './presence'
 import { auth } from './auth'
 import { homes } from './homes'
 import { tasks } from './tasks'
@@ -18,11 +21,17 @@ app.use('/api/*', async (c, next) => {
     }
   }
   await next()
+  if (c.res.status === 101) return
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) && c.res.ok && c.get('user')) {
+    c.executionCtx.waitUntil(notifyHouse(c.env, c.get('user').id).catch(error => console.error('Presence notification failed', error)))
+  }
   c.res.headers.set('Cache-Control', 'no-store')
   c.res.headers.set('Referrer-Policy', 'no-referrer')
   c.res.headers.set('X-Content-Type-Options', 'nosniff')
 })
 
+app.route('/api/presence', presence)
+app.route('/api/profile', profile)
 app.route('/api/auth', auth)
 app.route('/api/homes', homes)
 app.route('/api/tasks', tasks)
